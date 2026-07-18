@@ -21,9 +21,6 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Build APK
         working-directory: ./android_bridge_app
         run: |

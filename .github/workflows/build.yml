@@ -26,7 +26,9 @@ jobs:
 
       - name: Build APK
         working-directory: ./android_bridge_app
-        run: ./gradlew assembleDebug
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

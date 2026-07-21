@@ -1,0 +1,20 @@
+# 認証情報・秘密鍵（実際の値は絶対にコミットしない）
+.env
+.env.local
+config/client_secret.json
+config/token.json
+config/*credentials*.json
+config/*token*.json
+*credentials*.json
+*token*.json
+
+# 個人データのエクスポート（サイズ・機微情報の両面でリポジトリに含めない）
+*.zip
+*.log
+logs/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/

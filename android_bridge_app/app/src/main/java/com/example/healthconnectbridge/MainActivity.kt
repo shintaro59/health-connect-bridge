@@ -37,7 +37,9 @@ import androidx.health.connect.client.records.WeightRecord
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -128,22 +130,25 @@ fun MainScreen() {
                 scope.launch {
                     statusText = "取得中..."
                     try {
-                        val fetcher = HealthConnectFetcher(context)
-                        val sleepData = fetcher.fetchSleepData()
+                        val sleepData = withContext(Dispatchers.IO) {
+                            HealthConnectFetcher(context).fetchSleepData()
+                        }
 
                         if (clientId.isBlank() || clientSecret.isBlank() || refreshToken.isBlank()) {
                             statusText = "⚠️ 睡眠データは取得できましたが、Drive認証情報が未設定のためアップロードをスキップしました"
                         } else {
                             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                            val uploader = DriveUploader(clientId, clientSecret, refreshToken)
-                            val result = uploader.uploadSleepData("sleep_data_$timestamp.json", sleepData)
+                            val result = withContext(Dispatchers.IO) {
+                                DriveUploader(clientId, clientSecret, refreshToken)
+                                    .uploadSleepData("sleep_data_$timestamp.json", sleepData)
+                            }
                             statusText = result.fold(
                                 onSuccess = { "✅ Google Driveにアップロード完了 (fileId: $it)" },
-                                onFailure = { "❌ アップロード失敗: ${it.message}" }
+                                onFailure = { "❌ アップロード失敗: ${it.message ?: it.javaClass.simpleName}" }
                             )
                         }
                     } catch (e: Exception) {
-                        statusText = "❌ エラー: ${e.message}"
+                        statusText = "❌ エラー: ${e.message ?: e.javaClass.simpleName}"
                     }
                 }
             },

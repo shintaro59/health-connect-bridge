@@ -1,5 +1,6 @@
 package com.example.healthconnectbridge
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -105,7 +106,7 @@ class DriveUploader(
 
             val metadata = JSONObject().apply {
                 put("name", fileName)
-                put("parents", listOf(folderId))
+                put("parents", JSONArray().put(folderId))
             }
             createConn.outputStream.use { it.write(metadata.toString().toByteArray(Charsets.UTF_8)) }
 

@@ -1,0 +1,112 @@
+{
+  "transactions": [
+    {
+      "date": "2026-07-01",
+      "category": "食費",
+      "amount": 3500,
+      "description": "スーパー"
+    },
+    {
+      "date": "2026-07-02",
+      "category": "交通費",
+      "amount": 1200,
+      "description": "電車定期"
+    },
+    {
+      "date": "2026-07-03",
+      "category": "食費",
+      "amount": 2800,
+      "description": "カフェ・ランチ"
+    },
+    {
+      "date": "2026-07-05",
+      "category": "エンタメ",
+      "amount": 1500,
+      "description": "映画チケット"
+    },
+    {
+      "date": "2026-07-07",
+      "category": "食費",
+      "amount": 4200,
+      "description": "外食"
+    },
+    {
+      "date": "2026-07-08",
+      "category": "通信費",
+      "amount": 5000,
+      "description": "携帯電話"
+    },
+    {
+      "date": "2026-07-10",
+      "category": "食費",
+      "amount": 2500,
+      "description": "コンビニ"
+    },
+    {
+      "date": "2026-07-12",
+      "category": "衣料品",
+      "amount": 8000,
+      "description": "シャツ購入"
+    },
+    {
+      "date": "2026-07-14",
+      "category": "交通費",
+      "amount": 800,
+      "description": "タクシー"
+    },
+    {
+      "date": "2026-07-15",
+      "category": "食費",
+      "amount": 3200,
+      "description": "食材購入"
+    },
+    {
+      "date": "2026-07-16",
+      "category": "エンタメ",
+      "amount": 2000,
+      "description": "ゲーム購入"
+    },
+    {
+      "date": "2026-07-18",
+      "category": "食費",
+      "amount": 1800,
+      "description": "弁当"
+    },
+    {
+      "date": "2026-07-20",
+      "category": "医療費",
+      "amount": 3000,
+      "description": "医院"
+    },
+    {
+      "date": "2026-07-22",
+      "category": "衣料品",
+      "amount": 5500,
+      "description": "靴購入"
+    },
+    {
+      "date": "2026-07-24",
+      "category": "食費",
+      "amount": 2200,
+      "description": "スーパー"
+    },
+    {
+      "date": "2026-07-25",
+      "category": "交通費",
+      "amount": 1500,
+      "description": "駅近タクシー"
+    },
+    {
+      "date": "2026-07-27",
+      "category": "エンタメ",
+      "amount": 3000,
+      "description": "コンサートチケット"
+    },
+    {
+      "date": "2026-07-28",
+      "category": "食費",
+      "amount": 2100,
+      "description": "カレー"
+    }
+  ]
+}

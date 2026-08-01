@@ -12,6 +12,7 @@ config/*token*.json
 *.zip
 *.log
 logs/
+database/
 
 # Python
 __pycache__/

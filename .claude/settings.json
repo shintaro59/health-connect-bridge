@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\": \"📝 セッション終了前に、このセッション内のチャット内容を保存してください!\\n\\n【保存方法】\\n1. このセッション内のすべてのチャット内容をコピーしてください\\n2. 以下のコマンドを実行:\\n   python src/save_today_chat.py\\n3. スクリプトが起動したら、コピーしたチャット内容を貼り付けてください (Ctrl+D で終了)\\n\\nこれで本日の会話が database/YYYY-MM-DD_chat.md に保存されます。\", \"continue\": true}'",
+            "statusMessage": "チャット保存リマインダー"
+          }
+        ]
+      }
+    ]
+  }
+}

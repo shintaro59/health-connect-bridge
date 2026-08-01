@@ -364,23 +364,103 @@ async def test_annkate(email, password):
             print("🔚 ブラウザ終了")
 
 
+async def test_research_panel(email, password):
+    """リサーチパネル - CAPTCHA対応版"""
+    print("\n" + "="*70)
+    print("🔍 リサーチパネル - ログイン＆自動化テスト")
+    print("="*70)
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False)
+        page = await browser.new_page()
+
+        try:
+            print("📍 リサーチパネル にアクセス中...")
+            await page.goto("https://research-panel.jp/login/", timeout=30000)
+            await asyncio.sleep(2)
+
+            print("✅ ページロード完了")
+            print(f"📄 URL: {page.url}")
+            print(f"📝 タイトル: {await page.title()}")
+
+            # CAPTCHA検出
+            if await detect_captcha(page):
+                await wait_for_captcha_solve(page)
+
+            # ログイン画面を確認
+            if "login" in page.url.lower():
+                print("🔐 ログイン画面を検出。ログイン処理中...")
+
+                # メール入力（name='mail'）
+                try:
+                    await page.fill("input[name='mail']", email, timeout=5000)
+                    print("✅ メールアドレス入力完了")
+                except Exception as e:
+                    print(f"❌ メール入力失敗: {e}")
+                    return False
+
+                # パスワード入力
+                try:
+                    await page.fill("input[type='password']", password, timeout=5000)
+                    print("✅ パスワード入力完了")
+                except Exception as e:
+                    print(f"❌ パスワード入力失敗: {e}")
+                    return False
+
+                # ログインボタンクリック（id='submitWithGrecaptcha'）
+                try:
+                    await page.click("input#submitWithGrecaptcha", timeout=5000)
+                    print("🔄 ログイン処理中...")
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                    print("✅ ログイン成功")
+                except Exception as e:
+                    print(f"⚠️  ログイン処理エラー: {e}")
+                    return False
+
+                await asyncio.sleep(2)
+                print(f"📄 現在のURL: {page.url}")
+
+            # ページの構造を確認
+            await asyncio.sleep(2)
+
+            # アンケートフォームを探す
+            forms = await page.query_selector_all("form")
+            print(f"📋 フォーム検出数: {len(forms)}")
+
+            inputs = await page.query_selector_all("input[type='text'], textarea, select")
+            print(f"📝 入力フィールド検出数: {len(inputs)}")
+
+            # アンケート要素を探す
+            survey_buttons = await page.query_selector_all("button, [class*='survey']")
+            print(f"📝 ボタン/アンケート関連要素: {len(survey_buttons)}")
+
+            return True
+
+        except Exception as e:
+            print(f"❌ エラー: {e}")
+            return False
+        finally:
+            await browser.close()
+            print("🔚 ブラウザ終了")
+
+
 async def main():
     print("\n🚀 アンケートサイト自動化ツール")
     print("=" * 70)
-    print("対象サイト: マクロミル、ECナビ、アンとケイト")
+    print("対象サイト: リサーチパネル、マクロミル、アンとケイト、他")
     print("CAPTCHA対応: 手動解決可能（CAPTCHAが出現したらボタンを押してください）")
     print("=" * 70)
 
     # 各サイトの認証情報を対話的に入力
     print("\n📝 認証情報入力（パスワードは画面に表示されません）\n")
 
-    print("【マクロミル】")
+    print("【リサーチパネル】")
+    research_panel_email = input("📧 メールアドレス: ").strip()
+    research_panel_pass = getpass.getpass("🔐 パスワード: ")
+
+    print("\n【マクロミル】")
     macromill_email = input("📧 メールアドレス: ").strip()
     macromill_pass = getpass.getpass("🔐 パスワード: ")
-
-    print("\n【ECナビ】")
-    ecnavi_email = input("📧 メールアドレス: ").strip()
-    ecnavi_pass = getpass.getpass("🔐 パスワード: ")
 
     print("\n【アンとケイト】")
     annkate_email = input("📧 メールアドレス: ").strip()
@@ -392,14 +472,15 @@ async def main():
 
     results = []
 
-    # マクロミルを最初にテスト
+    # リサーチパネルをテスト
+    result = await test_research_panel(research_panel_email, research_panel_pass)
+    results.append(("リサーチパネル", result))
+
+    # マクロミルをテスト
     result = await test_macromill(macromill_email, macromill_pass)
     results.append(("マクロミル", result))
 
-    # 他のサイトもテスト
-    result = await test_ecnavi(ecnavi_email, ecnavi_pass)
-    results.append(("ECナビ", result))
-
+    # アンとケイトをテスト
     result = await test_annkate(annkate_email, annkate_pass)
     results.append(("アンとケイト", result))
 

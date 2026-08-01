@@ -371,6 +371,7 @@ async def test_dpoint_club(dpoint_url, use_remote_debug=True):
     print("="*70)
 
     async with async_playwright() as p:
+        browser = None
         try:
             if use_remote_debug:
                 # リモートデバッギングモードで実行中の Chrome に接続
@@ -387,7 +388,6 @@ async def test_dpoint_club(dpoint_url, use_remote_debug=True):
 
             page = await browser.new_page()
 
-        try:
             print("📍 dポイントクラブ にアクセス中...")
             print("   (Chrome のログイン状態を使用)")
             await page.goto(dpoint_url, timeout=30000)
@@ -427,10 +427,11 @@ async def test_dpoint_club(dpoint_url, use_remote_debug=True):
                 print("   💡 ヒント: Chrome が完全に閉じられているか確認してください")
             return False
         finally:
-            try:
-                await browser.close()
-            except:
-                pass
+            if browser:
+                try:
+                    await browser.close()
+                except:
+                    pass
             print("🔚 ブラウザ終了")
 
 

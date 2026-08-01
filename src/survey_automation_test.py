@@ -261,8 +261,7 @@ async def test_annkate(email, password):
 
             # CAPTCHA検出
             if await detect_captcha(page):
-                print("⚠️  CAPTCHA検出（Google reCAPTCHA） → スキップ（ユーザールール: CAPTCHA突破禁止）")
-                return False
+                await wait_for_captcha_solve(page)
 
             # ログイン画面を確認
             if "login" in page.url.lower():

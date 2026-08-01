@@ -364,22 +364,28 @@ async def test_annkate(email, password):
             print("🔚 ブラウザ終了")
 
 
-async def test_dpoint_club(dpoint_url):
-    """dポイントクラブ - Chrome プロフィール引き継ぎ版"""
+async def test_dpoint_club(dpoint_url, use_remote_debug=True):
+    """dポイントクラブ - リモートデバッギング版（Chrome を開いたまま使用）"""
     print("\n" + "="*70)
     print("🔍 dポイントクラブ - アンケートアクセステスト")
     print("="*70)
 
     async with async_playwright() as p:
-        # ユーザーの Chrome プロフィールを使用（ログイン状態を引き継ぐ）
-        chrome_profile_path = r"C:\Users\shint\AppData\Local\Google\Chrome\User Data"
+        try:
+            if use_remote_debug:
+                # リモートデバッギングモードで実行中の Chrome に接続
+                print("📡 リモートデバッギングモード: 既存の Chrome に接続中...")
+                browser = await p.chromium.connect_over_cdp("http://localhost:9222")
+            else:
+                # フォールバック：ユーザープロフィールを使用
+                chrome_profile_path = r"C:\Users\shint\AppData\Local\Google\Chrome\User Data"
+                browser = await p.chromium.launch(
+                    headless=False,
+                    user_data_dir=chrome_profile_path,
+                    args=["--disable-blink-features=AutomationControlled"]
+                )
 
-        browser = await p.chromium.launch(
-            headless=False,
-            user_data_dir=chrome_profile_path,
-            args=["--disable-blink-features=AutomationControlled"]
-        )
-        page = await browser.new_page()
+            page = await browser.new_page()
 
         try:
             print("📍 dポイントクラブ にアクセス中...")
@@ -413,10 +419,18 @@ async def test_dpoint_club(dpoint_url):
 
         except Exception as e:
             print(f"❌ エラー: {e}")
-            print("   💡 ヒント: Chrome が完全に閉じられているか確認してください")
+            if use_remote_debug:
+                print("   💡 ヒント: Chrome がリモートデバッギングモードで起動していることを確認してください")
+                print("   実行コマンド：")
+                print("   \"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --remote-debugging-port=9222")
+            else:
+                print("   💡 ヒント: Chrome が完全に閉じられているか確認してください")
             return False
         finally:
-            await browser.close()
+            try:
+                await browser.close()
+            except:
+                pass
             print("🔚 ブラウザ終了")
 
 
@@ -559,7 +573,13 @@ async def main():
     print("CAPTCHA対応: 手動解決可能（CAPTCHAが出現したらボタンを押してください）")
     print("=" * 70)
 
-    print("\n⚠️  重要：以下のサイトをテストする前に Chrome を完全に閉じてください！\n")
+    print("\n" + "="*70)
+    print("⚠️  重要：Chrome をリモートデバッギングモードで起動してください")
+    print("="*70)
+    print("\n【PowerShell で以下を実行：】")
+    print('  & "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222')
+    print("\n【その後、別のターミナルでこのスクリプトを実行】")
+    print("="*70 + "\n")
 
     # 各サイトの認証情報を対話的に入力
     print("📝 認証情報入力（パスワードは画面に表示されません）\n")

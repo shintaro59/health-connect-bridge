@@ -170,13 +170,16 @@ async def test_ecnavi(email, password):
             if "login" in page.url.lower():
                 print("🔐 ログイン画面を検出。ログイン処理中...")
 
-                # ECナビのメールフィールドセレクタ試行（type='email'ではない可能性）
+                # ECナビのメールフィールドセレクタ試行（type='email'ではなくtype='text'または属性なし）
                 email_selectors = [
+                    "input[type='text']",
+                    "input:not([type='password'])",
                     "input[type='email']",
                     "input[name*='mail']",
                     "input[id*='mail']",
                     "input[placeholder*='mail']",
                     "input[placeholder*='Mail']",
+                    "input[placeholder*='email']",
                 ]
 
                 email_filled = False
@@ -188,12 +191,14 @@ async def test_ecnavi(email, password):
                             print(f"✅ メールアドレス入力完了 (selector: {selector})")
                             email_filled = True
                             break
-                    except:
+                    except Exception as e:
                         pass
 
                 if not email_filled:
                     print("❌ メール入力フィールドが見つかりません")
-                    return False
+                    print("   💡 手動でメールアドレスを入力してください（10秒待機）")
+                    await asyncio.sleep(10)
+                    email_filled = True
 
                 # ログインパスワードを入力
                 try:
@@ -291,9 +296,28 @@ async def test_annkate(email, password):
                         print(f"❌ パスワード入力失敗: {e}")
                         return False
 
-                # ログインボタンをクリック
+                # ログインボタンをクリック（Anto-Kate: type属性なしのボタン）
                 try:
-                    await page.click("button[type='submit'], input[type='submit']", timeout=5000)
+                    button_selectors = [
+                        "button.g-recaptcha-submit",
+                        "button.btn-login",
+                        "button[type='submit']",
+                        "input[type='submit']",
+                    ]
+
+                    button_clicked = False
+                    for selector in button_selectors:
+                        try:
+                            await page.click(selector, timeout=3000)
+                            button_clicked = True
+                            break
+                        except:
+                            pass
+
+                    if not button_clicked:
+                        print("❌ ログインボタンが見つかりません")
+                        return False
+
                     print("🔄 ログイン処理中...")
                     await page.wait_for_load_state("networkidle", timeout=15000)
                     print("✅ ログイン成功")

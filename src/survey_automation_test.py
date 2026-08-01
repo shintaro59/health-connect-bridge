@@ -170,35 +170,47 @@ async def test_ecnavi(email, password):
             if "login" in page.url.lower():
                 print("🔐 ログイン画面を検出。ログイン処理中...")
 
-                # ECナビのメールフィールドセレクタ試行（type='email'ではなくtype='text'または属性なし）
-                email_selectors = [
-                    "input[type='text']",
-                    "input:not([type='password'])",
-                    "input[type='email']",
-                    "input[name*='mail']",
-                    "input[id*='mail']",
-                    "input[placeholder*='mail']",
-                    "input[placeholder*='Mail']",
-                    "input[placeholder*='email']",
-                ]
-
+                # ECナビのメール入力：ページの最初のinput要素を使用
                 email_filled = False
-                for selector in email_selectors:
-                    try:
-                        elem = await page.query_selector(selector)
-                        if elem:
-                            await elem.fill(email)
-                            print(f"✅ メールアドレス入力完了 (selector: {selector})")
-                            email_filled = True
-                            break
-                    except Exception as e:
-                        pass
+                try:
+                    # password フィールドの前の最初の input 要素を取得
+                    all_inputs = await page.query_selector_all("input")
+                    if all_inputs and len(all_inputs) > 0:
+                        # パスワード入力フィールドを除外した最初のinput
+                        for input_elem in all_inputs:
+                            input_type = await input_elem.get_attribute("type")
+                            if input_type != "password":
+                                await input_elem.fill(email)
+                                print("✅ メールアドレス入力完了")
+                                email_filled = True
+                                break
+                except Exception as e:
+                    print(f"   エラー: {e}")
+
+                if not email_filled:
+                    # セレクタベースのフォールバック
+                    email_selectors = [
+                        "input[type='text']",
+                        "input[type='email']",
+                        "input[name*='mail']",
+                        "input[id*='mail']",
+                    ]
+
+                    for selector in email_selectors:
+                        try:
+                            elem = await page.query_selector(selector)
+                            if elem:
+                                await elem.fill(email)
+                                print(f"✅ メールアドレス入力完了 (selector: {selector})")
+                                email_filled = True
+                                break
+                        except:
+                            pass
 
                 if not email_filled:
                     print("❌ メール入力フィールドが見つかりません")
-                    print("   💡 手動でメールアドレスを入力してください（10秒待機）")
-                    await asyncio.sleep(10)
-                    email_filled = True
+                    print("   💡 手動でメールアドレスを入力してください（15秒待機）")
+                    await asyncio.sleep(15)
 
                 # ログインパスワードを入力
                 try:

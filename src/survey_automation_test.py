@@ -364,6 +364,62 @@ async def test_annkate(email, password):
             print("🔚 ブラウザ終了")
 
 
+async def test_dpoint_club(dpoint_url):
+    """dポイントクラブ - Chrome プロフィール引き継ぎ版"""
+    print("\n" + "="*70)
+    print("🔍 dポイントクラブ - アンケートアクセステスト")
+    print("="*70)
+
+    async with async_playwright() as p:
+        # ユーザーの Chrome プロフィールを使用（ログイン状態を引き継ぐ）
+        chrome_profile_path = r"C:\Users\shint\AppData\Local\Google\Chrome\User Data"
+
+        browser = await p.chromium.launch(
+            headless=False,
+            user_data_dir=chrome_profile_path,
+            args=["--disable-blink-features=AutomationControlled"]
+        )
+        page = await browser.new_page()
+
+        try:
+            print("📍 dポイントクラブ にアクセス中...")
+            print("   (Chrome のログイン状態を使用)")
+            await page.goto(dpoint_url, timeout=30000)
+            await asyncio.sleep(3)
+
+            print("✅ ページロード完了")
+            print(f"📄 URL: {page.url}")
+            print(f"📝 タイトル: {await page.title()}")
+
+            # CAPTCHA検出
+            if await detect_captcha(page):
+                await wait_for_captcha_solve(page)
+
+            # ページの構造を確認
+            await asyncio.sleep(2)
+
+            # アンケートフォームを探す
+            forms = await page.query_selector_all("form")
+            print(f"📋 フォーム検出数: {len(forms)}")
+
+            inputs = await page.query_selector_all("input[type='text'], textarea, select")
+            print(f"📝 入力フィールド検出数: {len(inputs)}")
+
+            # アンケート要素を探す
+            survey_buttons = await page.query_selector_all("button, [class*='survey'], [class*='question']")
+            print(f"📝 ボタン/アンケート関連要素: {len(survey_buttons)}")
+
+            return True
+
+        except Exception as e:
+            print(f"❌ エラー: {e}")
+            print("   💡 ヒント: Chrome が完全に閉じられているか確認してください")
+            return False
+        finally:
+            await browser.close()
+            print("🔚 ブラウザ終了")
+
+
 async def test_pex(media_code_token_url):
     """PEX/Conio - メディアコード認証版（ログイン不要）"""
     print("\n" + "="*70)
@@ -499,14 +555,19 @@ async def test_research_panel(email, password):
 async def main():
     print("\n🚀 アンケートサイト自動化ツール")
     print("=" * 70)
-    print("対象サイト: PEX、リサーチパネル、マクロミル、アンとケイト、他")
+    print("対象サイト: dポイント、PEX、リサーチパネル、マクロミル、アンとケイト、他")
     print("CAPTCHA対応: 手動解決可能（CAPTCHAが出現したらボタンを押してください）")
     print("=" * 70)
 
-    # 各サイトの認証情報を対話的に入力
-    print("\n📝 認証情報入力（パスワードは画面に表示されません）\n")
+    print("\n⚠️  重要：以下のサイトをテストする前に Chrome を完全に閉じてください！\n")
 
-    print("【PEX（Conio）】")
+    # 各サイトの認証情報を対話的に入力
+    print("📝 認証情報入力（パスワードは画面に表示されません）\n")
+
+    print("【dポイントクラブ】")
+    dpoint_url = input("🔗 dポイント URL: ").strip()
+
+    print("\n【PEX（Conio）】")
     pex_url = input("🔗 PEX URL: ").strip()
 
     print("\n【リサーチパネル】")
@@ -526,6 +587,10 @@ async def main():
     print("="*70)
 
     results = []
+
+    # dポイントクラブをテスト（Chrome プロフィール使用）
+    result = await test_dpoint_club(dpoint_url)
+    results.append(("dポイントクラブ", result))
 
     # PEXをテスト
     result = await test_pex(pex_url)

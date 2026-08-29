@@ -366,7 +366,7 @@ fun MainScreen() {
                         val result = withContext(Dispatchers.IO) {
                             // 本番の起床検知と同じ形式で現在地も載せる。
                             // これにより天気確認まで含めたエンドツーエンドの動作確認ができる。
-                            val location = LocationHelper.currentLocation(applicationContext = context)
+                            val location = LocationHelper.currentLocation(context)
                             val locationText = when {
                                 location == null ->
                                     "現在地: 取得できませんでした（位置情報の権限が未許可の可能性があります）"

@@ -362,14 +362,25 @@ fun MainScreen() {
                     if (routineUrl.isBlank() || routineToken.isBlank()) {
                         statusText = "⚠️ 先にRoutine連携情報を保存してください"
                     } else {
-                        statusText = "テスト起動中..."
+                        statusText = "テスト起動中（現在地取得中）..."
                         val result = withContext(Dispatchers.IO) {
+                            // 本番の起床検知と同じ形式で現在地も載せる。
+                            // これにより天気確認まで含めたエンドツーエンドの動作確認ができる。
+                            val location = LocationHelper.currentLocation(applicationContext = context)
+                            val locationText = when {
+                                location == null ->
+                                    "現在地: 取得できませんでした（位置情報の権限が未許可の可能性があります）"
+                                location.label != null ->
+                                    "現在地: ${location.label}（緯度${location.latitude}, 経度${location.longitude}）"
+                                else ->
+                                    "現在地: 緯度${location.latitude}, 経度${location.longitude}"
+                            }
                             RoutineTrigger.fire(
                                 routineUrl,
                                 routineToken,
-                                "これはHealth Connect Bridgeアプリからのテスト起動です。" +
-                                    "起床検知の仕組みが正しく動くかの確認なので、実際の予定案内は行わず" +
-                                    "「テスト受信できました」とだけ短く返信してください。"
+                                "これはHealth Connect Bridgeアプリからのテスト起動です（実際の起床検知ではありません）。\n" +
+                                    "$locationText\n" +
+                                    "動作確認のため、実際の起床時と同じ手順（予定・天気の確認、メール送信）を通しで実行してください。"
                             )
                         }
                         statusText = result.fold(

@@ -46,4 +46,30 @@ class HealthConnectFetcher(private val context: Context) {
             Gson().toJson(mapOf("error" to e.message))
         }
     }
+
+    /**
+     * 起床検知用。直近の睡眠セッションのうち、最も新しい終了時刻だけを軽量に取得する。
+     * 過去1日分だけを見れば十分なので、7日分を取得するfetchSleepDataより軽い。
+     */
+    suspend fun fetchLatestSleepEndTime(): Instant? {
+        return try {
+            val client = HealthConnectClient.getOrCreate(context)
+            val now = Instant.now()
+            val oneDayAgo = now.minus(java.time.Duration.ofDays(1))
+
+            val records = client.readRecords(
+                ReadRecordsRequest(
+                    recordType = SleepSessionRecord::class,
+                    timeRangeFilter = androidx.health.connect.client.time.TimeRangeFilter.between(
+                        oneDayAgo,
+                        now
+                    )
+                )
+            )
+
+            records.records.maxByOrNull { it.endTime }?.endTime
+        } catch (e: Exception) {
+            null
+        }
+    }
 }

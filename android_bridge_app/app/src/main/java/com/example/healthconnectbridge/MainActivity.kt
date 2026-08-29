@@ -49,7 +49,10 @@ private const val PREFS_NAME = "health_connect_bridge_prefs"
 private const val KEY_CLIENT_ID = "drive_client_id"
 private const val KEY_CLIENT_SECRET = "drive_client_secret"
 private const val KEY_REFRESH_TOKEN = "drive_refresh_token"
+private const val KEY_ROUTINE_URL = "routine_trigger_url"
+private const val KEY_ROUTINE_TOKEN = "routine_trigger_token"
 const val SYNC_WORK_NAME = "health_connect_bridge_sync"
+const val WAKE_CHECK_WORK_NAME = "health_connect_bridge_wake_check"
 
 fun requiredPermissions(): Set<String> = setOf(
     HealthPermission.getReadPermission(SleepSessionRecord::class),
@@ -77,6 +80,8 @@ fun MainScreen() {
     var clientId by remember { mutableStateOf(prefs.getString(KEY_CLIENT_ID, "") ?: "") }
     var clientSecret by remember { mutableStateOf(prefs.getString(KEY_CLIENT_SECRET, "") ?: "") }
     var refreshToken by remember { mutableStateOf(prefs.getString(KEY_REFRESH_TOKEN, "") ?: "") }
+    var routineUrl by remember { mutableStateOf(prefs.getString(KEY_ROUTINE_URL, "") ?: "") }
+    var routineToken by remember { mutableStateOf(prefs.getString(KEY_ROUTINE_TOKEN, "") ?: "") }
     var statusText by remember { mutableStateOf("準備完了") }
     var permissionsGranted by remember { mutableStateOf(false) }
 
@@ -212,6 +217,80 @@ fun MainScreen() {
             modifier = Modifier.padding(top = 8.dp)
         ) {
             Text("保存")
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 24.dp))
+
+        Text(text = "起床検知 → Claude Routine 起動（claude.ai/code/routines で発行したAPIトリガーのURLとトークン）")
+
+        OutlinedTextField(
+            value = routineUrl,
+            onValueChange = { routineUrl = it },
+            label = { Text("Routine トリガーURL") },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        )
+        OutlinedTextField(
+            value = routineToken,
+            onValueChange = { routineToken = it },
+            label = { Text("Routine Bearerトークン") },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        )
+
+        Button(
+            onClick = {
+                prefs.edit()
+                    .putString(KEY_ROUTINE_URL, routineUrl)
+                    .putString(KEY_ROUTINE_TOKEN, routineToken)
+                    .apply()
+                statusText = "✅ Routine連携情報を保存しました"
+            },
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text("保存")
+        }
+
+        Button(
+            onClick = {
+                val request = PeriodicWorkRequestBuilder<WakeDetectionWorker>(15, TimeUnit.MINUTES)
+                    .build()
+                WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                    WAKE_CHECK_WORK_NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    request
+                )
+                statusText = "✅ 起床検知のバックグラウンドチェックを開始しました（15分ごと）"
+            },
+            modifier = Modifier.padding(top = 16.dp)
+        ) {
+            Text("起床検知を開始")
+        }
+
+        Button(
+            onClick = {
+                scope.launch {
+                    if (routineUrl.isBlank() || routineToken.isBlank()) {
+                        statusText = "⚠️ 先にRoutine連携情報を保存してください"
+                    } else {
+                        statusText = "テスト起動中..."
+                        val result = withContext(Dispatchers.IO) {
+                            RoutineTrigger.fire(
+                                routineUrl,
+                                routineToken,
+                                "これはHealth Connect Bridgeアプリからのテスト起動です。" +
+                                    "起床検知の仕組みが正しく動くかの確認なので、実際の予定案内は行わず" +
+                                    "「テスト受信できました」とだけ短く返信してください。"
+                            )
+                        }
+                        statusText = result.fold(
+                            onSuccess = { "✅ Routineをテスト起動しました" },
+                            onFailure = { "❌ 起動失敗: ${it.message ?: it.javaClass.simpleName}" }
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text("Routineを今すぐテスト起動")
         }
 
         Divider(modifier = Modifier.padding(vertical = 24.dp))

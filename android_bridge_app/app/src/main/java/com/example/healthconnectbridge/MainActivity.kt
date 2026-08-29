@@ -46,12 +46,16 @@ import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -62,8 +66,16 @@ private const val KEY_CLIENT_SECRET = "drive_client_secret"
 private const val KEY_REFRESH_TOKEN = "drive_refresh_token"
 private const val KEY_ROUTINE_URL = "routine_trigger_url"
 private const val KEY_ROUTINE_TOKEN = "routine_trigger_token"
+private const val KEY_LAST_WAKE_END_TIME = "last_wake_end_time_epoch_millis"
+private const val KEY_WAKE_BASELINE_SET = "wake_baseline_set"
 const val SYNC_WORK_NAME = "health_connect_bridge_sync"
 const val WAKE_CHECK_WORK_NAME = "health_connect_bridge_wake_check"
+
+private fun formatJst(epochMillis: Long): String {
+    return java.time.Instant.ofEpochMilli(epochMillis)
+        .atZone(ZoneId.of("Asia/Tokyo"))
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+}
 
 fun requiredPermissions(): Set<String> = setOf(
     HealthPermission.getReadPermission(SleepSessionRecord::class),
@@ -94,6 +106,7 @@ fun MainScreen() {
     var routineUrl by remember { mutableStateOf(prefs.getString(KEY_ROUTINE_URL, "") ?: "") }
     var routineToken by remember { mutableStateOf(prefs.getString(KEY_ROUTINE_TOKEN, "") ?: "") }
     var statusText by remember { mutableStateOf("準備完了") }
+    var diagnosticsText by remember { mutableStateOf("未確認（「状態を確認」を押してください）") }
     var permissionsGranted by remember { mutableStateOf(false) }
     var coarseLocationGranted by remember {
         mutableStateOf(
@@ -393,6 +406,75 @@ fun MainScreen() {
             modifier = Modifier.padding(top = 8.dp)
         ) {
             Text("Routineを今すぐテスト起動")
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 24.dp))
+
+        Text(text = "診断（自動起動しなかった場合に、ここで原因を切り分ける）")
+        Text(text = diagnosticsText, modifier = Modifier.padding(top = 8.dp))
+
+        Button(
+            onClick = {
+                scope.launch {
+                    diagnosticsText = "確認中..."
+                    diagnosticsText = withContext(Dispatchers.IO) {
+                        buildString {
+                            // ① 15分ごとの定期チェック自体が登録され続けているか
+                            val workInfos = try {
+                                WorkManager.getInstance(context)
+                                    .getWorkInfosForUniqueWork(WAKE_CHECK_WORK_NAME)
+                                    .get()
+                            } catch (e: Exception) {
+                                null
+                            }
+                            append("【定期チェックの登録状態】\n")
+                            if (workInfos.isNullOrEmpty()) {
+                                append("未登録です。「起床検知を開始」を押してください。\n\n")
+                            } else {
+                                workInfos.forEach { info: WorkInfo ->
+                                    append("状態: ${info.state}, 実行回数: ${info.runAttemptCount}\n")
+                                }
+                                append("\n")
+                            }
+
+                            // ② アプリが最後に「起床」として記録した時刻
+                            val lastWakeMillis = prefs.getLong(KEY_LAST_WAKE_END_TIME, -1L)
+                            val baselineSet = prefs.getBoolean(KEY_WAKE_BASELINE_SET, false)
+                            append("【アプリが記録している最終チェック時刻】\n")
+                            append(
+                                if (!baselineSet) "まだ基準値なし（定期チェックが一度も動いていません）\n\n"
+                                else "${formatJst(lastWakeMillis)}\n\n"
+                            )
+
+                            // ③ Health Connect上の「今の」最新の睡眠終了時刻（実際にライブ取得）
+                            val liveLatest = HealthConnectFetcher(context).fetchLatestSleepEndTime()
+                            append("【Health Connect上の最新の睡眠記録（今取得）】\n")
+                            append(
+                                if (liveLatest == null) "睡眠記録が見つかりません（Watchからの同期が済んでいない可能性）\n"
+                                else "${formatJst(liveLatest.toEpochMilli())}\n"
+                            )
+                            if (baselineSet && liveLatest != null && liveLatest.toEpochMilli() > lastWakeMillis) {
+                                append("\n→ アプリの記録より新しい睡眠記録があります。定期チェックが動いていないか、まだ次のチェックのタイミングが来ていない可能性があります。")
+                            }
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text("状態を確認")
+        }
+
+        Button(
+            onClick = {
+                WorkManager.getInstance(context).enqueue(
+                    OneTimeWorkRequestBuilder<WakeDetectionWorker>().build()
+                )
+                statusText = "起床チェックを1回だけ即時実行するようOSに依頼しました（数秒〜数十秒後に反映されます。「状態を確認」で結果を見てください）"
+            },
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text("起床チェックを今すぐ実行（本番と同じ処理）")
         }
 
         Divider(modifier = Modifier.padding(vertical = 24.dp))

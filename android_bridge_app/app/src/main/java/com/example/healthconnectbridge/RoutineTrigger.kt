@@ -26,6 +26,10 @@ object RoutineTrigger {
             conn.readTimeout = 15_000
             conn.setRequestProperty("Authorization", "Bearer $bearerToken")
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+            // Routine /fire エンドポイントの必須ヘッダー。欠けると
+            // 「anthropic-version: header is required」で400になる。
+            conn.setRequestProperty("anthropic-version", "2023-06-01")
+            conn.setRequestProperty("anthropic-beta", "experimental-cc-routine-2026-04-01")
 
             val body = JSONObject().apply { put("text", text) }
             conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }

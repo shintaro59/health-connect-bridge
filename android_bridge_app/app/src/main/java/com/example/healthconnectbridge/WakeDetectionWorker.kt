@@ -52,8 +52,22 @@ class WakeDetectionWorker(context: Context, params: WorkerParameters) : Coroutin
                 if (routineUrl.isNotBlank() && routineToken.isNotBlank()) {
                     val wakeTimeJst = latestEndTime.atZone(ZoneId.of("Asia/Tokyo"))
                         .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-                    val text = "起床を検知しました（Health Connect睡眠記録の終了時刻: $wakeTimeJst）。" +
-                        "今日の予定とお住まいの地域の天気を確認し、簡潔な「おはようございます」メッセージを通知してください。"
+
+                    // PCは自宅固定でも本人（スマホ）は移動するため、天気確認用に
+                    // 起床時点の現在地をベストエフォートで添える（取れない場合は省略）。
+                    val location = LocationHelper.currentLocation(applicationContext)
+                    val locationText = when {
+                        location == null ->
+                            "現在地: 取得できませんでした（位置情報の権限が未許可の可能性があります。天気は確認せずに進めてください）"
+                        location.label != null ->
+                            "現在地: ${location.label}（緯度${location.latitude}, 経度${location.longitude}）"
+                        else ->
+                            "現在地: 緯度${location.latitude}, 経度${location.longitude}"
+                    }
+
+                    val text = "起床を検知しました（Health Connect睡眠記録の終了時刻: $wakeTimeJst）。\n" +
+                        "$locationText\n" +
+                        "今日の予定と、上記の現在地の天気を確認し、簡潔な「おはようございます」メッセージを通知してください。"
 
                     val result = RoutineTrigger.fire(routineUrl, routineToken, text)
                     if (result.isFailure) {

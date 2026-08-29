@@ -1,10 +1,17 @@
 package com.example.healthconnectbridge
 
+import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +24,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,7 +33,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
@@ -84,6 +95,18 @@ fun MainScreen() {
     var routineToken by remember { mutableStateOf(prefs.getString(KEY_ROUTINE_TOKEN, "") ?: "") }
     var statusText by remember { mutableStateOf("準備完了") }
     var permissionsGranted by remember { mutableStateOf(false) }
+    var coarseLocationGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var backgroundLocationGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
 
     val healthConnectClient = remember { HealthConnectClient.getOrCreate(context) }
 
@@ -98,9 +121,38 @@ fun MainScreen() {
         }
     }
 
+    val requestCoarseLocation = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        coarseLocationGranted = granted
+        statusText = if (granted) {
+            "✅ 位置情報（使用中）が許可されました。続けて「常に許可」の設定もお願いします"
+        } else {
+            "⚠️ 位置情報の権限が許可されませんでした。天気の現在地確認はスキップされます"
+        }
+    }
+
     LaunchedEffect(Unit) {
         val granted = healthConnectClient.permissionController.getGrantedPermissions()
         permissionsGranted = granted.containsAll(requiredPermissions())
+    }
+
+    // 「設定で常に許可」から戻ってきた時に権限表示を再チェックする
+    // （設定画面遷移はActivityの外なので、Composeの状態が自動更新されないため）
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                coarseLocationGranted = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+                backgroundLocationGranted = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Column(
@@ -217,6 +269,45 @@ fun MainScreen() {
             modifier = Modifier.padding(top = 8.dp)
         ) {
             Text("保存")
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 24.dp))
+
+        Text(text = "位置情報（天気の判定に使用。PCは自宅固定でも本人は移動するため、都度スマホから取得）")
+        Text(
+            text = if (coarseLocationGranted && backgroundLocationGranted) {
+                "✅ 位置情報: 許可済み（使用中＋常に）"
+            } else if (coarseLocationGranted) {
+                "⚠️ 「使用中のみ」許可済み。バックグラウンド検知で使うには「常に許可」も必要です"
+            } else {
+                "⚠️ 位置情報: 未許可"
+            }
+        )
+
+        Button(
+            onClick = {
+                if (coarseLocationGranted) {
+                    statusText = "✅ 位置情報（使用中）は許可済みです"
+                } else {
+                    requestCoarseLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                }
+            },
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text("位置情報（使用中のみ）を許可")
+        }
+
+        Button(
+            onClick = {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                }
+                context.startActivity(intent)
+                statusText = "設定画面を開きました。「位置情報」→「常に許可」を選択してください"
+            },
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text("設定で「常に許可」にする")
         }
 
         Divider(modifier = Modifier.padding(vertical = 24.dp))

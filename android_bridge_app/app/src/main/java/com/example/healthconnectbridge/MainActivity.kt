@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -70,6 +71,8 @@ private const val KEY_ROUTINE_URL = "routine_trigger_url"
 private const val KEY_ROUTINE_TOKEN = "routine_trigger_token"
 private const val KEY_LAST_WAKE_END_TIME = "last_wake_end_time_epoch_millis"
 private const val KEY_WAKE_BASELINE_SET = "wake_baseline_set"
+private const val KEY_LAST_ALARM_FIRED_AT = "last_alarm_fired_at_epoch_millis"
+private const val KEY_ALARM_CHAIN_ENABLED = "alarm_chain_enabled"
 const val SYNC_WORK_NAME = "health_connect_bridge_sync"
 const val WAKE_CHECK_WORK_NAME = "health_connect_bridge_wake_check"
 
@@ -141,6 +144,9 @@ fun MainScreen() {
                 PackageManager.PERMISSION_GRANTED
         )
     }
+    var exactAlarmGranted by remember {
+        mutableStateOf(WakeCheckAlarmScheduler.canScheduleExactAlarms(context))
+    }
 
     val healthConnectClient = remember { HealthConnectClient.getOrCreate(context) }
 
@@ -183,6 +189,7 @@ fun MainScreen() {
                 backgroundLocationGranted = ContextCompat.checkSelfPermission(
                     context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
                 ) == PackageManager.PERMISSION_GRANTED
+                exactAlarmGranted = WakeCheckAlarmScheduler.canScheduleExactAlarms(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -374,16 +381,38 @@ fun MainScreen() {
             Text("保存")
         }
 
+        Text(
+            text = if (exactAlarmGranted) "✅ 正確なアラームの権限: 許可済み"
+                   else "⚠️ 正確なアラームの権限: 未許可（起床検知が確実に動きません）",
+            modifier = Modifier.padding(top = 16.dp)
+        )
         Button(
             onClick = {
-                val request = PeriodicWorkRequestBuilder<WakeDetectionWorker>(15, TimeUnit.MINUTES)
-                    .build()
-                WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                    WAKE_CHECK_WORK_NAME,
-                    ExistingPeriodicWorkPolicy.KEEP,
-                    request
-                )
-                statusText = "✅ 起床検知のバックグラウンドチェックを開始しました（15分ごと）"
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !exactAlarmGranted) {
+                    context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                    statusText = "設定画面を開きました。このアプリに「アラームとリマインダー」を許可してください"
+                } else {
+                    statusText = "✅ 正確なアラームの権限は既に許可されています"
+                }
+            },
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text("正確なアラームを許可（設定を開く）")
+        }
+
+        Button(
+            onClick = {
+                // WorkManagerのPeriodicWorkRequestは「システムの都合の良い時に」実行される設計で、
+                // Doze/アプリスタンバイバケットの対象になると丸1日以上動かないことがあると
+                // 実測で判明したため、Dozeを貫通するAlarmManagerの正確なアラームに切り替える。
+                WorkManager.getInstance(context).cancelUniqueWork(WAKE_CHECK_WORK_NAME)
+                prefs.edit().putBoolean(KEY_ALARM_CHAIN_ENABLED, true).apply()
+                WakeCheckAlarmScheduler.scheduleNext(context)
+                statusText = if (exactAlarmGranted) {
+                    "✅ 起床検知を開始しました（15分ごと、正確なアラーム方式）"
+                } else {
+                    "⚠️ 起床検知は開始しましたが、「正確なアラーム」の権限が無いため確実に動かない可能性があります。上のボタンから許可してください"
+                }
             },
             modifier = Modifier.padding(top = 16.dp)
         ) {
@@ -448,9 +477,19 @@ fun MainScreen() {
 
                     diagnosticsText = withContext(Dispatchers.IO) {
                         buildString {
-                            append("【定期チェックの登録状態】\n")
+                            // ① アラームチェーン（現在の主方式）が実際に発火し続けているか
+                            val chainEnabled = prefs.getBoolean(KEY_ALARM_CHAIN_ENABLED, false)
+                            val lastAlarmMillis = prefs.getLong(KEY_LAST_ALARM_FIRED_AT, -1L)
+                            append("【アラームチェーンの状態（現在の方式）】\n")
+                            append(if (chainEnabled) "有効\n" else "未開始。「起床検知を開始」を押してください。\n")
+                            append(
+                                if (lastAlarmMillis < 0) "まだ一度も発火していません\n\n"
+                                else "最後に発火した時刻: ${formatJst(lastAlarmMillis)}\n\n"
+                            )
+
+                            append("【旧方式：定期チェック（WorkManager）の登録状態、参考】\n")
                             if (workInfos.isNullOrEmpty()) {
-                                append("未登録です。「起床検知を開始」を押してください。\n\n")
+                                append("未登録です\n\n")
                             } else {
                                 workInfos.forEach { info: WorkInfo ->
                                     append("状態: ${info.state}, 実行回数: ${info.runAttemptCount}\n")

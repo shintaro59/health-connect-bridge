@@ -63,8 +63,4 @@ dependencies {
     implementation 'androidx.work:work-runtime-ktx:2.8.1'
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.google.android.gms:play-services-location:21.3.0'
-    // WorkManagerのgetWorkInfosForUniqueWork()等が返すListenableFutureをKotlinの
-    // コンパイル時に解決するためのもの。本物のGuava（guava-31.1-android、他の依存経由で
-    // ランタイムには既に存在）と実行時に衝突しないよう、compileOnlyでコンパイル時専用にする。
-    compileOnly 'com.google.guava:listenablefuture:1.0'
 }

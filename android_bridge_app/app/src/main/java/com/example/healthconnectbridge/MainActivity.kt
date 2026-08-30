@@ -45,6 +45,7 @@ import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
+import androidx.lifecycle.Observer
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
@@ -52,6 +53,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.time.ZoneId
@@ -70,6 +72,25 @@ private const val KEY_LAST_WAKE_END_TIME = "last_wake_end_time_epoch_millis"
 private const val KEY_WAKE_BASELINE_SET = "wake_baseline_set"
 const val SYNC_WORK_NAME = "health_connect_bridge_sync"
 const val WAKE_CHECK_WORK_NAME = "health_connect_bridge_wake_check"
+
+/**
+ * WorkManagerのgetWorkInfosForUniqueWork()はGuava ListenableFutureを返すが、
+ * このプロジェクトの依存関係だとバージョン解決が不安定でコンパイルが通らないことがあるため、
+ * 同じ情報を持つLiveData版を使い、1回だけ値を受け取って終了するsuspend関数にラップする。
+ */
+private suspend fun getWorkInfosOnce(context: Context, workName: String): List<WorkInfo> =
+    withContext(Dispatchers.Main) {
+        suspendCancellableCoroutine { cont ->
+            val liveData = WorkManager.getInstance(context).getWorkInfosForUniqueWorkLiveData(workName)
+            lateinit var observer: Observer<List<WorkInfo>>
+            observer = Observer { value ->
+                liveData.removeObserver(observer)
+                if (cont.isActive) cont.resumeWith(Result.success(value))
+            }
+            liveData.observeForever(observer)
+            cont.invokeOnCancellation { liveData.removeObserver(observer) }
+        }
+    }
 
 private fun formatJst(epochMillis: Long): String {
     return java.time.Instant.ofEpochMilli(epochMillis)
@@ -417,16 +438,16 @@ fun MainScreen() {
             onClick = {
                 scope.launch {
                     diagnosticsText = "確認中..."
+
+                    // ① 15分ごとの定期チェック自体が登録され続けているか
+                    val workInfos = try {
+                        getWorkInfosOnce(context, WAKE_CHECK_WORK_NAME)
+                    } catch (e: Exception) {
+                        null
+                    }
+
                     diagnosticsText = withContext(Dispatchers.IO) {
                         buildString {
-                            // ① 15分ごとの定期チェック自体が登録され続けているか
-                            val workInfos = try {
-                                WorkManager.getInstance(context)
-                                    .getWorkInfosForUniqueWork(WAKE_CHECK_WORK_NAME)
-                                    .get()
-                            } catch (e: Exception) {
-                                null
-                            }
                             append("【定期チェックの登録状態】\n")
                             if (workInfos.isNullOrEmpty()) {
                                 append("未登録です。「起床検知を開始」を押してください。\n\n")

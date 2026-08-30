@@ -3,6 +3,16 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+configurations.all {
+    resolutionStrategy {
+        // Gradleがバージョン番号だけで比較すると、Guavaが競合回避用に使っている
+        // 中身が空のダミー版（9999.0-empty-to-avoid-conflict-with-guava）の方を
+        // 「新しい」と誤判定して選んでしまい、ListenableFutureの実体が消えてコンパイルエラーになる。
+        // 実体を持つ1.0を明示的に強制する。
+        force 'com.google.guava:listenablefuture:1.0'
+    }
+}
+
 android {
     namespace 'com.example.healthconnectbridge'
     compileSdk 34

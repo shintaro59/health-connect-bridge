@@ -12,6 +12,8 @@ config/*token*.json
 *.zip
 *.log
 logs/
+
+# 日次チャットログ（個人の会話履歴、絶対にコミットしない）
 database/
 
 # Python

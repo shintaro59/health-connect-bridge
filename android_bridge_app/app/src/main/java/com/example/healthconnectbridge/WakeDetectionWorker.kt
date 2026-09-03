@@ -1,8 +1,11 @@
 package com.example.healthconnectbridge
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.delay
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -11,6 +14,29 @@ private const val KEY_ROUTINE_URL = "routine_trigger_url"
 private const val KEY_ROUTINE_TOKEN = "routine_trigger_token"
 private const val KEY_LAST_WAKE_END_TIME = "last_wake_end_time_epoch_millis"
 private const val KEY_WAKE_BASELINE_SET = "wake_baseline_set"
+private const val NETWORK_WAIT_TIMEOUT_MILLIS = 15_000L
+private const val NETWORK_WAIT_POLL_INTERVAL_MILLIS = 1_000L
+
+/**
+ * Dozeから叩き起こされた直後はまだネットワークが復帰しきっていないことがある。
+ * WorkManagerのConstraints（NetworkType.CONNECTED）で待たせる方式は、制約付きジョブが
+ * JobSchedulerの都合でDoze中は実行開始自体を延々遅らされてしまう問題があったため、
+ * ここで自前に短時間（最大15秒）ポーリングする。見つからなければ諦めてそのまま進み、
+ * 実際の通信（RoutineTrigger.fire）が失敗すればResult.retry()に任せる。
+ */
+private suspend fun waitForNetwork(context: Context) {
+    val connectivityManager =
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+    var waitedMillis = 0L
+    while (waitedMillis < NETWORK_WAIT_TIMEOUT_MILLIS) {
+        val network = connectivityManager.activeNetwork
+        val capabilities = network?.let { connectivityManager.getNetworkCapabilities(it) }
+        val isConnected = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        if (isConnected) return
+        delay(NETWORK_WAIT_POLL_INTERVAL_MILLIS)
+        waitedMillis += NETWORK_WAIT_POLL_INTERVAL_MILLIS
+    }
+}
 
 /**
  * 15分ごとにHealth Connectの睡眠記録を軽くチェックし、
@@ -50,6 +76,8 @@ class WakeDetectionWorker(context: Context, params: WorkerParameters) : Coroutin
                 val routineToken = prefs.getString(KEY_ROUTINE_TOKEN, "") ?: ""
 
                 if (routineUrl.isNotBlank() && routineToken.isNotBlank()) {
+                    waitForNetwork(applicationContext)
+
                     val wakeTimeJst = latestEndTime.atZone(ZoneId.of("Asia/Tokyo"))
                         .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
 

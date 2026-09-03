@@ -3,8 +3,6 @@ package com.example.healthconnectbridge
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.work.Constraints
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 
@@ -19,9 +17,13 @@ private const val KEY_ALARM_CHAIN_ENABLED = "alarm_chain_enabled"
  *
  * BroadcastReceiver#onReceiveは長時間処理してはいけないため、実処理はWorkManagerに委譲する。
  *
- * Dozeから叩き起こされた直後はまだネットワークが復帰しきっていないことがあり、
- * 制約無しだと「即座に試みて通信エラーで失敗、そのまま記録もされない」ということが
- * 実際に起きたため、ネットワークが使えるようになるまでWorkManager側で待たせる制約を付ける。
+ * 【重要】ここで enqueue するジョブに Constraints（NetworkType.CONNECTED等）を付けてはいけない。
+ * 一度「Dozeから叩き起こされた直後はネットワークが復帰しきっていない」問題を制約付きで
+ * 解消しようとしたが、制約付きのWorkRequestはOneTimeWorkRequestであってもJobSchedulerの
+ * 「都合の良いタイミングまで実行開始を遅らせる」対象になり得ることが判明し、
+ * 実際に「アラームは15分おきに発火し続けているのに、実処理が丸4日間一度も完走しない」
+ * という、まさにPeriodicWorkRequestをやめた理由と同じ症状が再発した。
+ * ネットワーク待ちは WakeDetectionWorker#doWork 側で自前ポーリングする方式に変更済み。
  */
 class WakeCheckAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -33,13 +35,9 @@ class WakeCheckAlarmReceiver : BroadcastReceiver() {
             WakeCheckAlarmScheduler.scheduleNext(context)
         }
 
-        val request = OneTimeWorkRequestBuilder<WakeDetectionWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
-            .build()
+        // 制約なし。enqueueした瞬間にOSへ「今すぐ実行してほしい」依頼が行くだけの、
+        // 一番遅延の少ない形にする。
+        val request = OneTimeWorkRequestBuilder<WakeDetectionWorker>().build()
         WorkManager.getInstance(context).enqueue(request)
     }
 }

@@ -15,6 +15,32 @@ import org.json.JSONObject
 object ClaudeInjection {
 
     /**
+     * ページ読み込み開始時（onPageStarted）にできるだけ早く注入する、
+     * 未処理のJSエラーをネイティブ側（window.ClaudeBridge.onJsError）へ転送するフック。
+     * 画面が真っ白になる系の不具合は大抵ここかconsole.errorのどちらかで拾える。
+     */
+    const val EARLY_ERROR_SCRIPT = """
+        (function() {
+            if (window.__claudeWatchBridgeErrorHookInstalled) return;
+            window.__claudeWatchBridgeErrorHookInstalled = true;
+
+            window.addEventListener('error', function(event) {
+                if (window.ClaudeBridge) {
+                    var msg = '[JSエラー] ' + (event.message || '') + ' @ ' + (event.filename || '') + ':' + (event.lineno || '');
+                    window.ClaudeBridge.onJsError(msg);
+                }
+            });
+
+            window.addEventListener('unhandledrejection', function(event) {
+                if (window.ClaudeBridge) {
+                    var reason = event.reason && (event.reason.message || event.reason.toString()) || String(event.reason);
+                    window.ClaudeBridge.onJsError('[未処理のPromiseエラー] ' + reason);
+                }
+            });
+        })();
+    """
+
+    /**
      * ページ読み込み完了時に一度だけ注入する監視スクリプト。
      * Claudeの返信（アシスタント側の最新メッセージ）が更新されるたびに、
      * ストリーミング表示が落ち着く（1.5秒間変化がなくなる）のを待ってから

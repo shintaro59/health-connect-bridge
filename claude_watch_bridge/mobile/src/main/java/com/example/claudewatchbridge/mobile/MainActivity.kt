@@ -7,7 +7,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
@@ -30,6 +32,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // chrome://inspect でこのWebViewの中身をPCから覗けるようにする（デバッグ用）。
+        // デバッグビルドでしか使わないので常時有効化して問題ない。
+        WebView.setWebContentsDebuggingEnabled(true)
 
         NotificationHelper.ensureChannel(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -56,8 +62,50 @@ class MainActivity : ComponentActivity() {
             WebView(context).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
-                // claude.aiへ普段Chromeでログインしているのと同じ状態を維持したいので、
-                // Cookie等は標準のWebViewストレージにそのまま任せる（別途クリアはしない）。
+
+                // デフォルトのWebViewのUser-Agentには「; wv)」というマーカーが付いていて、
+                // サイト側が「組み込みWebViewからのアクセス」と判定してログイン後の画面を
+                // 出さない（Googleが自社サービスへの埋め込みWebViewログインをブロックするのは
+                // 有名だが、他のサービスも同様の判定をしていることがある）。
+                // 通常のモバイルChromeと見分けが付かないUser-Agentに書き換える。
+                settings.userAgentString = settings.userAgentString
+                    .replace("; wv", "")
+                    .replace(Regex("Version/[\\d.]+ "), "")
+
+                // ログインフローの一部（他サービス連携等）がCookieの読み書きを
+                // 別オリジン経由で行うことがあるため、サードパーティCookieも許可しておく。
+                CookieManager.getInstance().setAcceptCookie(true)
+                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                // ログイン処理中にJavaScriptがwindow.open()で別ウィンドウを開こうとすると、
+                // 普通のWebViewは何もせず握りつぶしてしまい、画面が真っ白なまま固まって見える
+                // ことがある。同じWebView内でそのURLを開く形で代替する。
+                settings.setSupportMultipleWindows(true)
+                settings.javaScriptCanOpenWindowsAutomatically = true
+                webChromeClient = object : WebChromeClient() {
+                    override fun onCreateWindow(
+                        view: WebView,
+                        isDialog: Boolean,
+                        isUserGesture: Boolean,
+                        resultMsg: android.os.Message
+                    ): Boolean {
+                        val newWebView = WebView(view.context)
+                        val transport = resultMsg.obj as WebView.WebViewTransport
+                        transport.webView = newWebView
+                        resultMsg.sendToTarget()
+                        newWebView.webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(
+                                v: WebView,
+                                request: android.webkit.WebResourceRequest
+                            ): Boolean {
+                                // 新規ウィンドウ扱いにせず、元のWebViewでそのままそのURLを開く。
+                                view.loadUrl(request.url.toString())
+                                return true
+                            }
+                        }
+                        return true
+                    }
+                }
 
                 addJavascriptInterface(ClaudeJsBridge(this@MainActivity), "ClaudeBridge")
 

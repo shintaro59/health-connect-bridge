@@ -26,13 +26,31 @@ jobs:
         with:
           gradle-version: 8.2
 
-      - name: Build APK
+      - name: Build health-connect-bridge APK
         working-directory: ./android_bridge_app
         run: gradle assembleDebug
 
-      - name: Upload APK
+      - name: Upload health-connect-bridge APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug.apk
           path: ./android_bridge_app/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Build Claude Watch Bridge APKs
+        working-directory: ./claude_watch_bridge
+        run: gradle :mobile:assembleDebug :wear:assembleDebug
+
+      - name: Upload Claude Watch Bridge mobile APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-watch-bridge-mobile-debug.apk
+          path: ./claude_watch_bridge/mobile/build/outputs/apk/debug/mobile-debug.apk
+          retention-days: 30
+
+      - name: Upload Claude Watch Bridge wear APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-watch-bridge-wear-debug.apk
+          path: ./claude_watch_bridge/wear/build/outputs/apk/debug/wear-debug.apk
           retention-days: 30

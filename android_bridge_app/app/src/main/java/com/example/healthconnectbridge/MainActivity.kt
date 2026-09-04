@@ -104,12 +104,20 @@ private fun formatJst(epochMillis: Long): String {
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 }
 
+// ACCESS_BACKGROUND_LOCATIONと同じ理屈で、WorkManagerのバックグラウンドジョブから
+// Health Connectを読むにはこの権限も別途必要（フォアグラウンドのActivityから読むだけなら不要）。
+// androidx.health.connect:connect-client 1.1.0-alpha02 時点では名前付き定数が
+// 提供されていないため、Health Connect公式ドキュメント記載の文字列をそのまま使う。
+private const val PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND =
+    "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+
 fun requiredPermissions(): Set<String> = setOf(
     HealthPermission.getReadPermission(SleepSessionRecord::class),
     HealthPermission.getReadPermission(ExerciseSessionRecord::class),
     HealthPermission.getReadPermission(HeartRateRecord::class),
     HealthPermission.getReadPermission(StepsRecord::class),
     HealthPermission.getReadPermission(WeightRecord::class),
+    PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND,
 )
 
 class MainActivity : ComponentActivity() {

@@ -50,26 +50,30 @@ class HealthConnectFetcher(private val context: Context) {
     /**
      * 起床検知用。直近の睡眠セッションのうち、最も新しい終了時刻だけを軽量に取得する。
      * 過去1日分だけを見れば十分なので、7日分を取得するfetchSleepDataより軽い。
+     *
+     * 【重要】ここで例外を握りつぶしてnullを返してはいけない。呼び出し元
+     * （WakeDetectionWorker）はnullを「まだ睡眠記録が無い」という正常系として
+     * 扱うため、権限不足等の異常でも同じnullが返ると診断のしようがなくなる
+     * （実際に READ_HEALTH_DATA_IN_BACKGROUND 権限が無い状態でこの握りつぶしが
+     * 起き、「エラーは記録されないのに最終チェック時刻も更新されない」という
+     * 症状の原因になっていた）。例外はそのまま呼び出し元に投げ、
+     * WakeDetectionWorker側のrecordError()で記録させる。
      */
     suspend fun fetchLatestSleepEndTime(): Instant? {
-        return try {
-            val client = HealthConnectClient.getOrCreate(context)
-            val now = Instant.now()
-            val oneDayAgo = now.minus(java.time.Duration.ofDays(1))
+        val client = HealthConnectClient.getOrCreate(context)
+        val now = Instant.now()
+        val oneDayAgo = now.minus(java.time.Duration.ofDays(1))
 
-            val records = client.readRecords(
-                ReadRecordsRequest(
-                    recordType = SleepSessionRecord::class,
-                    timeRangeFilter = androidx.health.connect.client.time.TimeRangeFilter.between(
-                        oneDayAgo,
-                        now
-                    )
+        val records = client.readRecords(
+            ReadRecordsRequest(
+                recordType = SleepSessionRecord::class,
+                timeRangeFilter = androidx.health.connect.client.time.TimeRangeFilter.between(
+                    oneDayAgo,
+                    now
                 )
             )
+        )
 
-            records.records.maxByOrNull { it.endTime }?.endTime
-        } catch (e: Exception) {
-            null
-        }
+        return records.records.maxByOrNull { it.endTime }?.endTime
     }
 }

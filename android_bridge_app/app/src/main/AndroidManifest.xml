@@ -7,6 +7,13 @@
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <!-- ACCESS_BACKGROUND_LOCATIONと同様、WorkManagerのバックグラウンド実行からの
+         Health Connect読み取りには、フォアグラウンド用の各READ_*権限とは別に
+         この権限が必要（Android 14+で必須）。これが無いと、フォアグラウンドの
+         Activityから呼べば読めるのに、バックグラウンドのdoWorkから呼ぶと
+         例外が発生し、しかもHealthConnectFetcher側で握りつぶされるため
+         症状が「エラーなく何も更新されない」という分かりにくい形で出る。 -->
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 端末再起動後にアラームチェーンを再開するために必要 -->

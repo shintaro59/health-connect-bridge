@@ -6,7 +6,7 @@ import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-private const val MAX_ENTRIES = 80
+private const val MAX_ENTRIES = 150
 
 /**
  * 画面が真っ白で何も操作できない状態でも原因を追えるように、

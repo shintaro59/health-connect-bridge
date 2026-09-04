@@ -173,11 +173,23 @@ class MainActivity : ComponentActivity() {
                     // Reactアプリが内部で握りつぶしているエラーも、大抵はここか
                     // window.onerror（下のEARLY_ERROR_SCRIPT）のどちらかに出てくる。
                     override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                        val source = consoleMessage.sourceId() ?: ""
+                        val isError = consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR
+                        // アナリティクス系（isolated-segment / gtag / datadog等）のログは大量に出て
+                        // 80件しか持てないログバッファを埋め尽くしてしまうため、エラーでなければ捨てる。
+                        val isNoisyAnalytics = !isError && (
+                            source.contains("isolated-segment") ||
+                                source.contains("datadog") ||
+                                source.contains("gtag") ||
+                                source.contains("analytics")
+                            )
+                        if (isNoisyAnalytics) return true
+
                         val text = "[console.${consoleMessage.messageLevel()}] ${consoleMessage.message()}" +
-                            " (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})"
+                            " ($source:${consoleMessage.lineNumber()})"
                         Log.d("ClaudeWatchBridge", text)
                         DebugLog.add(text)
-                        if (consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                        if (isError) {
                             Toast.makeText(this@MainActivity, text, Toast.LENGTH_LONG).show()
                         }
                         return true

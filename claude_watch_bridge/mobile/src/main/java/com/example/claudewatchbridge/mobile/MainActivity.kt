@@ -20,11 +20,29 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 
@@ -54,7 +72,48 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    ClaudeWebView()
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        ClaudeWebView(modifier = Modifier.weight(1f))
+                        Divider()
+                        LogPanel(modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * DebugLogの中身を常時表示するだけのパネル。WebView側が真っ白でも
+     * ここだけは必ず生きているので、PC無しでも今何が起きているかを追える。
+     */
+    @Composable
+    private fun LogPanel(modifier: Modifier = Modifier) {
+        val entries by DebugLog.entries.collectAsState()
+        val listState = rememberLazyListState()
+
+        LaunchedEffect(entries.size) {
+            if (entries.isNotEmpty()) {
+                listState.animateScrollToItem(entries.size - 1)
+            }
+        }
+
+        Column(modifier = modifier.background(Color(0xFF1E1E1E))) {
+            Text(
+                text = "デバッグログ",
+                color = Color.White,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
+                items(entries) { line ->
+                    Text(
+                        text = line,
+                        color = Color(0xFF00FF88),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                    )
                 }
             }
         }
@@ -62,8 +121,8 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     @Composable
-    private fun ClaudeWebView() {
-        AndroidView(factory = { context ->
+    private fun ClaudeWebView(modifier: Modifier = Modifier) {
+        AndroidView(modifier = modifier, factory = { context ->
             WebView(context).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
@@ -118,6 +177,7 @@ class MainActivity : ComponentActivity() {
                         val text = "[console.${consoleMessage.messageLevel()}] ${consoleMessage.message()}" +
                             " (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})"
                         Log.d("ClaudeWatchBridge", text)
+                        DebugLog.add(text)
                         if (consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
                             Toast.makeText(this@MainActivity, text, Toast.LENGTH_LONG).show()
                         }
@@ -130,6 +190,7 @@ class MainActivity : ComponentActivity() {
                 webViewClient = object : WebViewClient() {
                     override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
                         super.onPageStarted(view, url, favicon)
+                        DebugLog.add("→ 遷移開始: $url")
                         // onPageFinishedを待つと、そこに到達する前に発生したエラーを取り逃すため、
                         // ページ読み込み開始時点でエラー捕捉フックを先に仕込んでおく。
                         view.evaluateJavascript(ClaudeInjection.EARLY_ERROR_SCRIPT, null)
@@ -137,6 +198,7 @@ class MainActivity : ComponentActivity() {
 
                     override fun onPageFinished(view: WebView, url: String?) {
                         super.onPageFinished(view, url)
+                        DebugLog.add("✓ 読み込み完了: $url")
                         view.evaluateJavascript(ClaudeInjection.OBSERVER_SCRIPT, null)
                     }
 
@@ -146,14 +208,29 @@ class MainActivity : ComponentActivity() {
                         error: WebResourceError
                     ) {
                         super.onReceivedError(view, request, error)
-                        if (!request.isForMainFrame) return
-                        val text = "[読み込みエラー] ${error.description} (${request.url})"
+                        val text = "[読み込みエラー${if (request.isForMainFrame) "・メインフレーム" else ""}] " +
+                            "${error.description} (${request.url})"
                         Log.e("ClaudeWatchBridge", text)
-                        Toast.makeText(this@MainActivity, text, Toast.LENGTH_LONG).show()
+                        DebugLog.add(text)
+                        if (request.isForMainFrame) {
+                            Toast.makeText(this@MainActivity, text, Toast.LENGTH_LONG).show()
+                        }
+                    }
+
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest
+                    ): Boolean {
+                        // trueを返すと自分でloadUrlしない限りその遷移を握りつぶすことになるため、
+                        // ここでは何もせずfalse（デフォルトの、WebView自身が遷移する挙動）を返す。
+                        // ログだけ残して、意図しない外部アプリへのIntentディスパッチが起きていないか追えるようにする。
+                        DebugLog.add("shouldOverrideUrlLoading: ${request.url}")
+                        return false
                     }
                 }
 
                 loadUrl(CLAUDE_URL)
+                DebugLog.add("loadUrl($CLAUDE_URL) を呼び出しました")
                 ClaudeWebBridgeState.attachWebView(this)
             }
         })
@@ -181,6 +258,7 @@ class MainActivity : ComponentActivity() {
         fun onJsError(text: String) {
             mainHandler.post {
                 Log.e("ClaudeWatchBridge", text)
+                DebugLog.add(text)
                 Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
             }
         }

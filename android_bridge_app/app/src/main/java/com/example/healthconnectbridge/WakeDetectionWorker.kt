@@ -14,6 +14,9 @@ private const val KEY_ROUTINE_URL = "routine_trigger_url"
 private const val KEY_ROUTINE_TOKEN = "routine_trigger_token"
 private const val KEY_LAST_WAKE_END_TIME = "last_wake_end_time_epoch_millis"
 private const val KEY_WAKE_BASELINE_SET = "wake_baseline_set"
+private const val KEY_LAST_WORKER_STARTED_AT = "last_worker_started_at_epoch_millis"
+private const val KEY_LAST_ERROR = "last_worker_error"
+private const val KEY_LAST_ERROR_AT = "last_worker_error_at_epoch_millis"
 private const val NETWORK_WAIT_TIMEOUT_MILLIS = 15_000L
 private const val NETWORK_WAIT_POLL_INTERVAL_MILLIS = 1_000L
 
@@ -51,9 +54,13 @@ private suspend fun waitForNetwork(context: Context) {
 class WakeDetectionWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        return try {
-            val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        // doWork自体が本当に呼ばれているか（＝ジョブの実行開始そのもの）を、
+        // 例外の有無に関わらず必ず記録する。これが更新されないなら、WorkManagerが
+        // ジョブを実行すらしていないということなので、原因の切り分けに使う。
+        prefs.edit().putLong(KEY_LAST_WORKER_STARTED_AT, System.currentTimeMillis()).apply()
 
+        return try {
             val latestEndTime = HealthConnectFetcher(applicationContext).fetchLatestSleepEndTime()
                 ?: return Result.success() // 睡眠記録がまだない。次回また確認。
 
@@ -100,7 +107,9 @@ class WakeDetectionWorker(context: Context, params: WorkerParameters) : Coroutin
                     val result = RoutineTrigger.fire(routineUrl, routineToken, text)
                     if (result.isFailure) {
                         // 通信失敗時はKEY_LAST_WAKE_END_TIMEを更新せずリトライし、
-                        // 次回のワーカー実行で再送を試みる。
+                        // 次回のワーカー実行で再送を試みる。原因が分からないと
+                        // 何度失敗しても気付けないため、理由を必ず記録しておく。
+                        recordError(prefs, result.exceptionOrNull())
                         return Result.retry()
                     }
                 }
@@ -110,7 +119,18 @@ class WakeDetectionWorker(context: Context, params: WorkerParameters) : Coroutin
 
             Result.success()
         } catch (e: Exception) {
+            // ここで握りつぶすと「なぜ最終チェック時刻が更新されないか」を
+            // 診断画面から一切追えなくなってしまうため、必ず記録してから続行する。
+            recordError(prefs, e)
             Result.retry()
         }
+    }
+
+    private fun recordError(prefs: android.content.SharedPreferences, error: Throwable?) {
+        val text = if (error == null) "（詳細不明のエラー）" else "${error.javaClass.simpleName}: ${error.message}"
+        prefs.edit()
+            .putString(KEY_LAST_ERROR, text)
+            .putLong(KEY_LAST_ERROR_AT, System.currentTimeMillis())
+            .apply()
     }
 }

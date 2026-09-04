@@ -73,6 +73,9 @@ private const val KEY_LAST_WAKE_END_TIME = "last_wake_end_time_epoch_millis"
 private const val KEY_WAKE_BASELINE_SET = "wake_baseline_set"
 private const val KEY_LAST_ALARM_FIRED_AT = "last_alarm_fired_at_epoch_millis"
 private const val KEY_ALARM_CHAIN_ENABLED = "alarm_chain_enabled"
+private const val KEY_LAST_WORKER_STARTED_AT = "last_worker_started_at_epoch_millis"
+private const val KEY_LAST_ERROR = "last_worker_error"
+private const val KEY_LAST_ERROR_AT = "last_worker_error_at_epoch_millis"
 const val SYNC_WORK_NAME = "health_connect_bridge_sync"
 const val WAKE_CHECK_WORK_NAME = "health_connect_bridge_wake_check"
 
@@ -505,6 +508,21 @@ fun MainScreen() {
                                 if (!baselineSet) "まだ基準値なし（定期チェックが一度も動いていません）\n\n"
                                 else "${formatJst(lastWakeMillis)}\n\n"
                             )
+
+                            // ②' doWork自体が本当に呼ばれているか、呼ばれた上で例外が出ていないか
+                            val lastWorkerStartedAt = prefs.getLong(KEY_LAST_WORKER_STARTED_AT, -1L)
+                            append("【ジョブ（doWork）が最後に実行された時刻】\n")
+                            append(
+                                if (lastWorkerStartedAt < 0) "まだ一度も実行されていません\n\n"
+                                else "${formatJst(lastWorkerStartedAt)}\n\n"
+                            )
+
+                            val lastError = prefs.getString(KEY_LAST_ERROR, null)
+                            val lastErrorAt = prefs.getLong(KEY_LAST_ERROR_AT, -1L)
+                            if (lastError != null) {
+                                append("【最後に発生したエラー】\n")
+                                append("${formatJst(lastErrorAt)}\n$lastError\n\n")
+                            }
 
                             // ③ Health Connect上の「今の」最新の睡眠終了時刻（実際にライブ取得）
                             val liveLatest = HealthConnectFetcher(context).fetchLatestSleepEndTime()

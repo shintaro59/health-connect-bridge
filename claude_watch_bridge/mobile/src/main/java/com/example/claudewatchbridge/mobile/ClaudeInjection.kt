@@ -69,8 +69,14 @@ object ClaudeInjection {
                     }
                     return;
                 }
+                // position: fixed / absolute の要素（ヘッダーやバナー等）は、
+                // アニメーション途中でたまたま高さ0として観測されただけのことがあり、
+                // それを親いっぱいの高さに引き伸ばしてしまうと、透明な巨大パネルが
+                // 画面全体を覆ってタップを奪ってしまう事故になる（実機で確認済み）。
+                // 通常フロー（static/relative）の箱だけを対象にする。
+                var isOutOfFlow = cs.position === 'fixed' || cs.position === 'absolute';
                 var rect = el.getBoundingClientRect();
-                if (rect.height === 0 && el.children.length > 0) {
+                if (!isOutOfFlow && rect.height === 0 && el.children.length > 0) {
                     el.style.setProperty('height', parentHeightPx + 'px', 'important');
                 }
                 var effectiveHeight = el.getBoundingClientRect().height || parentHeightPx;

@@ -41,6 +41,42 @@ object ClaudeInjection {
     """
 
     /**
+     * この端末のWebViewは、100vh/100dvhのようなビューポート相対単位のCSS計算が
+     * 常に0になってしまう（claude.aiのCSSとは無関係の、まっさらな要素で試しても
+     * 再現する、WebViewエンジン自体の不具合）ことが実機調査で判明した。
+     * claude.aiのレイアウトは`min-h-screen`（min-height: 100dvh）を土台にしているため、
+     * これが0になるとbody以下が丸ごと高さ0になり、画面が真っ白に見える。
+     *
+     * window.innerHeightは正しい値を返しており、固定px指定なら高さ計算も
+     * 正常に動くことも確認済みなので、html/bodyの高さを固定pxで強制上書きする
+     * ことで回避する。仮想キーボード表示等でinnerHeightが変わることもあるため、
+     * resizeイベントでも再適用する。
+     */
+    const val VIEWPORT_HEIGHT_FIX_SCRIPT = """
+        (function() {
+            function applyViewportHeightFix() {
+                var px = window.innerHeight + 'px';
+                var html = document.documentElement;
+                var body = document.body;
+                if (html) {
+                    html.style.setProperty('height', px, 'important');
+                    html.style.setProperty('min-height', px, 'important');
+                }
+                if (body) {
+                    body.style.setProperty('height', px, 'important');
+                    body.style.setProperty('min-height', px, 'important');
+                }
+            }
+            applyViewportHeightFix();
+            window.addEventListener('resize', applyViewportHeightFix);
+            // bodyがまだ無い（onPageStarted時点）場合に備えて、少し遅らせても再適用する。
+            setTimeout(applyViewportHeightFix, 0);
+            setTimeout(applyViewportHeightFix, 300);
+            setTimeout(applyViewportHeightFix, 1000);
+        })();
+    """
+
+    /**
      * ページ読み込み完了時に一度だけ注入する監視スクリプト。
      * Claudeの返信（アシスタント側の最新メッセージ）が更新されるたびに、
      * ストリーミング表示が落ち着く（1.5秒間変化がなくなる）のを待ってから

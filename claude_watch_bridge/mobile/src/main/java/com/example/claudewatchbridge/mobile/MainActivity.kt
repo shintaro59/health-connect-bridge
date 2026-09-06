@@ -215,12 +215,17 @@ class MainActivity : ComponentActivity() {
                         // onPageFinishedを待つと、そこに到達する前に発生したエラーを取り逃すため、
                         // ページ読み込み開始時点でエラー捕捉フックを先に仕込んでおく。
                         view.evaluateJavascript(ClaudeInjection.EARLY_ERROR_SCRIPT, null)
+                        // vh/dvh単位が0になってしまう不具合の回避策も、できるだけ早く仕込む。
+                        view.evaluateJavascript(ClaudeInjection.VIEWPORT_HEIGHT_FIX_SCRIPT, null)
                     }
 
                     override fun onPageFinished(view: WebView, url: String?) {
                         super.onPageFinished(view, url)
                         DebugLog.add("✓ 読み込み完了: $url")
                         view.evaluateJavascript(ClaudeInjection.OBSERVER_SCRIPT, null)
+                        // レイアウト確定後にも改めて適用し直す（onPageStarted時点はまだ
+                        // bodyが無い場合があるため、こちらが本番）。
+                        view.evaluateJavascript(ClaudeInjection.VIEWPORT_HEIGHT_FIX_SCRIPT, null)
                     }
 
                     override fun onReceivedError(

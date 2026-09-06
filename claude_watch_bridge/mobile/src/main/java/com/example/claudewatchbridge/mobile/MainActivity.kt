@@ -126,6 +126,16 @@ class MainActivity : ComponentActivity() {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
 
+                // WebViewはデフォルトだと、ページ自身の<meta name="viewport">を無視して
+                // PCサイト向けの仮想ビューポート（980dp幅相当）で描画してしまう。
+                // この状態では、vh/dvhのような「実画面サイズ基準」のCSS単位の解決が
+                // 実機の画面サイズと噛み合わなくなり、正しく計算されない
+                // （固定px指定だけは効くのに、min-height: 100dvh等を使う要素の高さが
+                // 0になって画面が真っ白に見える、という症状の原因になっていた）。
+                // ページ側のviewportメタタグをちゃんと尊重させる。
+                settings.useWideViewPort = true
+                settings.loadWithOverviewMode = true
+
                 // デフォルトのWebViewのUser-Agentには「; wv)」というマーカーが付いていて、
                 // サイト側が「組み込みWebViewからのアクセス」と判定してログイン後の画面を
                 // 出さない（Googleが自社サービスへの埋め込みWebViewログインをブロックするのは

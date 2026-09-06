@@ -44,35 +44,70 @@ object ClaudeInjection {
      * この端末のWebViewは、100vh/100dvhのようなビューポート相対単位のCSS計算が
      * 常に0になってしまう（claude.aiのCSSとは無関係の、まっさらな要素で試しても
      * 再現する、WebViewエンジン自体の不具合）ことが実機調査で判明した。
-     * claude.aiのレイアウトは`min-h-screen`（min-height: 100dvh）を土台にしているため、
-     * これが0になるとbody以下が丸ごと高さ0になり、画面が真っ白に見える。
      *
-     * window.innerHeightは正しい値を返しており、固定px指定なら高さ計算も
-     * 正常に動くことも確認済みなので、html/bodyの高さを固定pxで強制上書きする
-     * ことで回避する。仮想キーボード表示等でinnerHeightが変わることもあるため、
-     * resizeイベントでも再適用する。
+     * 最初はhtml/bodyだけを固定pxで上書きすれば直ると考えていたが、実際には
+     * body→(display:contents)→(display:contents)→div.root→div.grid...と、
+     * vh/dvh依存の高さ0が何階層にもわたって連鎖していることが分かった。
+     * どの階層がどのクラス名で壊れているかを個別に追いかけるより、
+     * 「高さ0で子要素を持つ箱を見つけたら、親の実際の高さを継承させる」処理を
+     * ツリー全体に再帰的に適用する方が確実（CSSのheight:100%継承をJS側で
+     * 肩代わりするイメージ）。display:contentsの要素は箱を持たないので
+     * スキップし、そのまま同じ高さ基準を子へ渡す。
+     *
+     * Reactの再描画で毎回インラインスタイルが上書き・削除される可能性があるため、
+     * MutationObserverで継続的に再適用する（デバウンス付き）。
      */
     const val VIEWPORT_HEIGHT_FIX_SCRIPT = """
         (function() {
-            function applyViewportHeightFix() {
-                var px = window.innerHeight + 'px';
-                var html = document.documentElement;
-                var body = document.body;
-                if (html) {
-                    html.style.setProperty('height', px, 'important');
-                    html.style.setProperty('min-height', px, 'important');
+            function heal(el, parentHeightPx) {
+                if (!el || el.nodeType !== 1) return;
+                var cs = window.getComputedStyle(el);
+                if (cs.display === 'none') return;
+                if (cs.display === 'contents') {
+                    for (var i = 0; i < el.children.length; i++) {
+                        heal(el.children[i], parentHeightPx);
+                    }
+                    return;
                 }
-                if (body) {
-                    body.style.setProperty('height', px, 'important');
-                    body.style.setProperty('min-height', px, 'important');
+                var rect = el.getBoundingClientRect();
+                if (rect.height === 0 && el.children.length > 0) {
+                    el.style.setProperty('height', parentHeightPx + 'px', 'important');
+                }
+                var effectiveHeight = el.getBoundingClientRect().height || parentHeightPx;
+                for (var j = 0; j < el.children.length; j++) {
+                    heal(el.children[j], effectiveHeight);
                 }
             }
+
+            function applyViewportHeightFix() {
+                var px = window.innerHeight;
+                var html = document.documentElement;
+                if (html) {
+                    html.style.setProperty('height', px + 'px', 'important');
+                    html.style.setProperty('min-height', px + 'px', 'important');
+                }
+                if (document.body) {
+                    heal(document.body, px);
+                }
+            }
+
             applyViewportHeightFix();
             window.addEventListener('resize', applyViewportHeightFix);
-            // bodyがまだ無い（onPageStarted時点）場合に備えて、少し遅らせても再適用する。
             setTimeout(applyViewportHeightFix, 0);
             setTimeout(applyViewportHeightFix, 300);
             setTimeout(applyViewportHeightFix, 1000);
+            setTimeout(applyViewportHeightFix, 3000);
+
+            // Reactの再描画でインラインスタイルが巻き戻される場合に備えて、
+            // DOM変化を監視して再適用する（1秒デバウンス）。
+            var debounceTimer = null;
+            var observer = new MutationObserver(function() {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(applyViewportHeightFix, 1000);
+            });
+            if (document.body) {
+                observer.observe(document.body, { childList: true, subtree: true });
+            }
         })();
     """
 

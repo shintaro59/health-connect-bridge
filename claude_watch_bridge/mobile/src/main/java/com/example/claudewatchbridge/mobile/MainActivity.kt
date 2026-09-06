@@ -31,7 +31,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,14 +69,23 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        ClaudeWebView(modifier = Modifier.weight(1f))
-                        Divider()
-                        LogPanel(modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp))
-                    }
+                // 【注意】ここに以前はSurfaceを使っていたが、Surfaceはクリップのために
+                // 内部でgraphicsLayerを適用しており、これが子孫のAndroidView（WebView）を
+                // オフスクリーンのビットマップ経由で合成させてしまい、その過程で
+                // WebViewの描画だけが不自然にぼやける（実機で確認済み・
+                // 実際のChromeブラウザでは同じページがクッキリ表示されることと対比して
+                // 判明した）。クリップやelevationが不要なただの背景色コンテナなので、
+                // 素のColumn+背景色に置き換えてgraphicsLayerの発生を避ける。
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    ClaudeWebView(modifier = Modifier.weight(1f))
+                    Divider()
+                    LogPanel(modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp))
                 }
             }
         }

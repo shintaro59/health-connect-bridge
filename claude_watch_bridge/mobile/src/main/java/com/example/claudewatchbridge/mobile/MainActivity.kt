@@ -126,15 +126,13 @@ class MainActivity : ComponentActivity() {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
 
-                // WebViewはデフォルトだと、ページ自身の<meta name="viewport">を無視して
-                // PCサイト向けの仮想ビューポート（980dp幅相当）で描画してしまう。
-                // この状態では、vh/dvhのような「実画面サイズ基準」のCSS単位の解決が
-                // 実機の画面サイズと噛み合わなくなり、正しく計算されない
-                // （固定px指定だけは効くのに、min-height: 100dvh等を使う要素の高さが
-                // 0になって画面が真っ白に見える、という症状の原因になっていた）。
-                // ページ側のviewportメタタグをちゃんと尊重させる。
-                settings.useWideViewPort = true
-                settings.loadWithOverviewMode = true
+                // 【試したが効果がなく、副作用だけ残った設定】
+                // 当初、useWideViewPort/loadWithOverviewMode を有効化すればvh/dvhが
+                // 0になる問題が直るのではと考えたが、実際には効果がなく
+                // （真の原因はVIEWPORT_HEIGHT_FIX_SCRIPTのJS側での回避で解決した）、
+                // 代わりにloadWithOverviewModeの「ページを縮小して読み込んでから
+                // 引き伸ばす」挙動のせいで、チャット部分の描画だけがぼやける
+                // 副作用が出たため撤去した。
 
                 // デフォルトのWebViewのUser-Agentには「; wv)」というマーカーが付いていて、
                 // サイト側が「組み込みWebViewからのアクセス」と判定してログイン後の画面を

@@ -253,8 +253,27 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                loadUrl(CLAUDE_URL)
-                DebugLog.add("loadUrl($CLAUDE_URL) を呼び出しました")
+                // 【重要】ここでloadUrl()をすぐ呼ぶと、Composeの Modifier.weight(1f) による
+                // 最終サイズ確定より前に読み込みが始まってしまう。実機調査の結果、
+                // その状態で読み込まれたページはwindow.devicePixelRatioが本来の値
+                // （Pixel 6aなら2.6程度）からズレた中途半端な値（2.225等）のまま
+                // 固定されてしまい、後からCSS上のサイズだけ正しくなっても
+                // 描画倍率のズレ（＝表示がぼやける）は直らないことが分かった。
+                // View自身が実際に非ゼロサイズを得るまで待ってからloadUrl()する。
+                if (width > 0 && height > 0) {
+                    loadUrl(CLAUDE_URL)
+                    DebugLog.add("loadUrl($CLAUDE_URL) を呼び出しました（初回サイズ確定済み）")
+                } else {
+                    viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                        override fun onGlobalLayout() {
+                            if (width > 0 && height > 0) {
+                                viewTreeObserver.removeOnGlobalLayoutListener(this)
+                                loadUrl(CLAUDE_URL)
+                                DebugLog.add("loadUrl($CLAUDE_URL) を呼び出しました（サイズ確定待ち後: ${width}x${height}）")
+                            }
+                        }
+                    })
+                }
                 ClaudeWebBridgeState.attachWebView(this)
             }
         })

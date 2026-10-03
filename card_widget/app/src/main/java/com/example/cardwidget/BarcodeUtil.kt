@@ -27,8 +27,8 @@ object BarcodeUtil {
     fun encode(
         content: String,
         format: BarcodeFormat = BarcodeFormat.CODE_128,
-        width: Int = 600,
-        height: Int = 200,
+        width: Int = 900,
+        height: Int = 320,
     ): Bitmap? {
         if (content.isBlank()) return null
         return try {

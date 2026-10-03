@@ -5,14 +5,15 @@
     android:layout_height="match_parent"
     android:background="@drawable/card_bg_library"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="10dp">
 
     <TextView
         android:id="@+id/item_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
         android:textColor="#FFFFFF"
-        android:textSize="14sp"
+        android:textSize="13sp"
         android:textStyle="bold" />
 
     <FrameLayout
@@ -20,17 +21,15 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="10dp"
         android:background="@drawable/widget_background"
-        android:padding="8dp">
+        android:padding="4dp">
 
         <ImageView
             android:id="@+id/item_barcode"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:adjustViewBounds="true"
             android:contentDescription="@null"
-            android:scaleType="fitCenter" />
+            android:scaleType="fitXY" />
 
         <TextView
             android:id="@+id/item_empty_hint"

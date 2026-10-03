@@ -8,4 +8,5 @@
     android:initialLayout="@layout/card_widget_stack"
     android:configure="com.example.cardwidget.CardWidgetConfigureActivity"
     android:resizeMode="horizontal|vertical"
-    android:widgetCategory="home_screen" />
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable" />

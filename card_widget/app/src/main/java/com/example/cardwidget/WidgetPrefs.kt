@@ -15,6 +15,7 @@ object WidgetPrefs {
     private fun keyLibraryFormat(appWidgetId: Int) = "library_format_$appWidgetId"
     private fun keyRakutenValue(appWidgetId: Int) = "rakuten_value_$appWidgetId"
     private fun keyRakutenFormat(appWidgetId: Int) = "rakuten_format_$appWidgetId"
+    private fun keyPageIndex(appWidgetId: Int) = "page_index_$appWidgetId"
 
     fun saveLibrary(context: Context, appWidgetId: Int, value: String, format: BarcodeFormat) {
         prefs(context).edit()
@@ -40,12 +41,20 @@ object WidgetPrefs {
         format = readFormat(context, keyRakutenFormat(appWidgetId)),
     )
 
+    fun getPageIndex(context: Context, appWidgetId: Int): Int =
+        prefs(context).getInt(keyPageIndex(appWidgetId), 0)
+
+    fun setPageIndex(context: Context, appWidgetId: Int, index: Int) {
+        prefs(context).edit().putInt(keyPageIndex(appWidgetId), index).apply()
+    }
+
     fun clear(context: Context, appWidgetId: Int) {
         prefs(context).edit()
             .remove(keyLibraryValue(appWidgetId))
             .remove(keyLibraryFormat(appWidgetId))
             .remove(keyRakutenValue(appWidgetId))
             .remove(keyRakutenFormat(appWidgetId))
+            .remove(keyPageIndex(appWidgetId))
             .apply()
     }
 

@@ -60,9 +60,28 @@ object BarcodeUtil {
         null
     }
 
+    // 店頭スキャナー向けの1次元バーコードだけを対象にする。
+    // 実物のカードにはQRコードも一緒に印刷されていることが多く、制限しないとそちらを誤って読み取ってしまう。
+    private val linearFormats = listOf(
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.CODE_93,
+        BarcodeFormat.CODABAR,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.ITF,
+    )
+
     private fun decodeFromBitmap(bitmap: Bitmap): ScanResult? {
         val reader = MultiFormatReader()
-        reader.setHints(mapOf(DecodeHintType.TRY_HARDER to true))
+        reader.setHints(
+            mapOf(
+                DecodeHintType.TRY_HARDER to true,
+                DecodeHintType.POSSIBLE_FORMATS to linearFormats,
+            ),
+        )
 
         // 通常の向きでまず試し、ダメなら90度刻みで回転させて再トライ（スマホ写真はよく傾いているため）
         for (rotation in intArrayOf(0, 90, 180, 270)) {

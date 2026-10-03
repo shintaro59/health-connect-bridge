@@ -5,8 +5,8 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.RemoteViews
-import android.widget.Toast
 import com.google.zxing.BarcodeFormat
 
 private data class Page(
@@ -21,8 +21,6 @@ class CardWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val ACTION_NEXT_CARD = "com.example.cardwidget.ACTION_NEXT_CARD"
-        const val ACTION_OPEN_APP = "com.example.cardwidget.ACTION_OPEN_APP"
-        const val EXTRA_TARGET_PACKAGE = "extra_target_package"
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -35,24 +33,12 @@ class CardWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
         val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
 
-        when (intent.action) {
-            ACTION_NEXT_CARD -> {
-                if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
-                val pages = buildPages(context, appWidgetId)
-                val nextIndex = (WidgetPrefs.getPageIndex(context, appWidgetId) + 1) % pages.size
-                WidgetPrefs.setPageIndex(context, appWidgetId, nextIndex)
-                updateWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
-            }
-            ACTION_OPEN_APP -> {
-                val pkg = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
-                val launchIntent = pkg?.let { context.packageManager.getLaunchIntentForPackage(it) }
-                if (launchIntent != null) {
-                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(launchIntent)
-                } else {
-                    Toast.makeText(context, R.string.app_not_installed, Toast.LENGTH_SHORT).show()
-                }
-            }
+        if (intent.action == ACTION_NEXT_CARD) {
+            if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+            val pages = buildPages(context, appWidgetId)
+            val nextIndex = (WidgetPrefs.getPageIndex(context, appWidgetId) + 1) % pages.size
+            WidgetPrefs.setPageIndex(context, appWidgetId, nextIndex)
+            updateWidget(context, AppWidgetManager.getInstance(context), appWidgetId)
         }
     }
 
@@ -98,15 +84,18 @@ fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, appWidget
         views.setViewVisibility(R.id.barcode_patch, android.view.View.GONE)
         views.setViewVisibility(R.id.item_shortcut_hint, android.view.View.VISIBLE)
 
-        val openAppIntent = Intent(context, CardWidgetProvider::class.java).apply {
-            action = CardWidgetProvider.ACTION_OPEN_APP
-            putExtra(CardWidgetProvider.EXTRA_TARGET_PACKAGE, page.value)
+        // ブロードキャスト経由だと端末によって実行が抑制されることがあるため、
+        // タップから直接アプリ(またはストア検索)を開くPendingIntentにする。
+        val targetIntent = context.packageManager.getLaunchIntentForPackage(page.value)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${page.value}")).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        val openAppPendingIntent = PendingIntent.getBroadcast(
+        val openAppPendingIntent = PendingIntent.getActivity(
             context,
             appWidgetId * 10 + 1,
-            openAppIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+            targetIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         views.setOnClickPendingIntent(R.id.card_root, openAppPendingIntent)
     } else {

@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Android 11以降のパッケージ可視性制限対策。これが無いと実際にインストールされていても
+         getLaunchIntentForPackage()がnullを返し、「未インストール」と誤判定してしまう -->
+    <queries>
+        <package android:name="jp.ne.paypay.android.app" />
+        <package android:name="jp.quodigital.android.quocardpay" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

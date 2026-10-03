@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">カードウィジェット</string>
+
+    <string name="page_library">図書館カード</string>
+    <string name="page_rakuten">楽天カード</string>
+    <string name="page_quocard">QUOカードPay</string>
+    <string name="page_paypay">PayPay</string>
+
+    <string name="shortcut_hint">タップしてアプリを開く</string>
+    <string name="app_not_installed">アプリがインストールされていません</string>
+
+    <!-- 動的バーコードを提供するアプリのパッケージ名（公式アプリを直接起動するだけで、
+         コード自体は生成しません。有効期限付きの決済コードを自前で再現するのは
+         各社の利用規約・セキュリティ上の理由から行いません） -->
+    <string name="package_paypay" translatable="false">jp.ne.paypay.android.app</string>
+    <string name="package_quocard" translatable="false">jp.quodigital.android.quocardpay</string>
+
+    <string name="configure_title">カード番号の設定</string>
+    <string name="configure_library_hint">図書館カードの番号</string>
+    <string name="configure_rakuten_hint">楽天カードの番号</string>
+    <string name="configure_scan_button">写真から読み取る</string>
+    <string name="configure_save">保存してウィジェットを追加</string>
+    <string name="configure_note">番号・バーコードの写真はこの端末内だけに処理・保存され、どこにも送信されません。ウィジェットを長押し→編集 からいつでも変更できます。</string>
+    <string name="scan_success">読み取り成功: %1$s</string>
+    <string name="scan_failed">バーコードを読み取れませんでした。写真を変えて試すか、番号を直接入力してください</string>
+
+    <string name="main_title">カードウィジェット</string>
+    <string name="main_description">ホーム画面を長押し →「ウィジェット」→「カードウィジェット」を選んで追加してください。追加時にカード番号を設定する画面が開きます。\n\n追加後は、ウィジェットを左右にスワイプすると、図書館カード・楽天カードのバーコードと、QUOカードPay・PayPayの起動ショートカットを切り替えられます。\n\nカード番号を変更したい時は、ウィジェットを長押し →「編集」からいつでも設定し直せます。</string>
+</resources>

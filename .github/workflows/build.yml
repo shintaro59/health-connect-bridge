@@ -54,3 +54,14 @@ jobs:
           name: claude-watch-bridge-wear-debug.apk
           path: ./claude_watch_bridge/wear/build/outputs/apk/debug/wear-debug.apk
           retention-days: 30
+
+      - name: Build Card Widget APK
+        working-directory: ./card_widget
+        run: gradle assembleDebug
+
+      - name: Upload Card Widget APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: card-widget-debug.apk
+          path: ./card_widget/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

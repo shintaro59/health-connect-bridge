@@ -26,6 +26,7 @@ private class CardStackFactory(
         val isShortcut: Boolean,
         val title: String,
         val value: String,
+        val backgroundRes: Int,
         val format: com.google.zxing.BarcodeFormat = com.google.zxing.BarcodeFormat.CODE_128,
     )
 
@@ -43,10 +44,10 @@ private class CardStackFactory(
         val library = WidgetPrefs.getLibrary(context, appWidgetId)
         val rakuten = WidgetPrefs.getRakuten(context, appWidgetId)
         pages = listOf(
-            Page(isShortcut = false, title = context.getString(R.string.page_library), value = library.value, format = library.format),
-            Page(isShortcut = false, title = context.getString(R.string.page_rakuten), value = rakuten.value, format = rakuten.format),
-            Page(isShortcut = true, title = context.getString(R.string.page_quocard), value = context.getString(R.string.package_quocard)),
-            Page(isShortcut = true, title = context.getString(R.string.page_paypay), value = context.getString(R.string.package_paypay)),
+            Page(isShortcut = false, title = context.getString(R.string.page_library), value = library.value, backgroundRes = R.drawable.card_bg_library, format = library.format),
+            Page(isShortcut = false, title = context.getString(R.string.page_rakuten), value = rakuten.value, backgroundRes = R.drawable.card_bg_rakuten, format = rakuten.format),
+            Page(isShortcut = true, title = context.getString(R.string.page_quocard), value = context.getString(R.string.package_quocard), backgroundRes = R.drawable.card_bg_quocard),
+            Page(isShortcut = true, title = context.getString(R.string.page_paypay), value = context.getString(R.string.package_paypay), backgroundRes = R.drawable.card_bg_paypay),
         )
     }
 
@@ -65,6 +66,7 @@ private class CardStackFactory(
 
     private fun buildBarcodeView(page: Page): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.card_widget_item_barcode)
+        views.setInt(R.id.item_root, "setBackgroundResource", page.backgroundRes)
         views.setTextViewText(R.id.item_title, page.title)
         val bitmap = BarcodeUtil.encode(page.value, format = page.format)
         if (bitmap != null) {
@@ -80,6 +82,7 @@ private class CardStackFactory(
 
     private fun buildShortcutView(page: Page): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.card_widget_item_shortcut)
+        views.setInt(R.id.item_root, "setBackgroundResource", page.backgroundRes)
         views.setTextViewText(R.id.item_title, page.title)
         val fillInIntent = Intent().apply {
             putExtra(CardWidgetProvider.EXTRA_TARGET_PACKAGE, page.value)

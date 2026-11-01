@@ -1,18 +1,35 @@
 #!/usr/bin/env python3
-"""config/keep_credentials.json の雛形を生成する（実際のclient_secretは手動で差し替えること）"""
+"""config/keep_credentials.json を生成する。
+
+client_id / client_secret はコードに書かず、環境変数（または .env）から読む。
+  GOOGLE_CLIENT_ID=...
+  GOOGLE_CLIENT_SECRET=...
+"""
 import json
+import os
+import sys
 from pathlib import Path
 
-CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / 'config'
+from dotenv import load_dotenv
+
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+CONFIG_DIR = ROOT_DIR / 'config'
+
+load_dotenv(ROOT_DIR / '.env')
+
+client_id = os.environ.get("GOOGLE_CLIENT_ID")
+client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+if not client_id or not client_secret:
+    sys.exit("GOOGLE_CLIENT_ID と GOOGLE_CLIENT_SECRET を環境変数か .env に設定してください")
 
 credentials = {
     "installed": {
-        "client_id": "878048780015-34rb137p5kpcp6mbhaoi2pmsdq13hba3.apps.googleusercontent.com",
+        "client_id": client_id,
         "project_id": "health-database-sync",
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",
         "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_secret": "GOCSPX-placeholder",
+        "client_secret": client_secret,
         "redirect_uris": ["http://localhost:8080/"]
     }
 }
